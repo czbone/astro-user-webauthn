@@ -104,6 +104,16 @@ pnpm test
 
 Vitest で純関数テストと API スモーク（DB モック）を実行します。ウォッチ実行は `pnpm test:watch` です。
 
+実 PostgreSQL を使う統合テスト:
+
+```bash
+docker compose -f docker-compose.db.yaml up -d
+# .env に TEST_DATABASE_URL を設定（.env.example 参照）
+pnpm test:integration
+```
+
+単体と統合の両方は `pnpm test:all` です。
+
 ### 静的チェック
 
 ```bash

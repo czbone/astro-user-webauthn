@@ -2,7 +2,7 @@
 
 ## 自動テスト
 
-Vitest で純関数テストと Hono API スモークテストを実行できます。DB はモックし、実 PostgreSQL / Playwright / パスキー UI は使いません。
+### 単体・API スモーク（DB モック）
 
 ```bash
 pnpm install
@@ -15,10 +15,47 @@ pnpm test
 pnpm test:watch
 ```
 
-### 対象
+対象:
 
 - `src/server/auth/*.test.ts` — パスワード・トークン・レート制限・チャレンジなどの純関数
 - `src/server/api/app.test.ts` — `app.request()` による API スモーク（未認証応答など）
+
+実 PostgreSQL / Playwright / パスキー UI は使いません。
+
+### 統合テスト（実 PostgreSQL）
+
+専用 DB（`TEST_DATABASE_URL`）に対して、モックなしで API + Prisma を検証します。パスキー登録セレモニー自体は対象外です（Credential 行のフィクスチャ挿入のみ）。
+
+```bash
+# 1. テスト用 Postgres（Docker がある場合）
+docker compose -f docker-compose.db.yaml up -d
+
+# 既存のローカル Postgres を使う場合は、DATABASE_URL と同じ接続先に
+# DB `astro_webauthn_test` を作り .env へ TEST_DATABASE_URL を追記できる:
+# pnpm exec tsx scripts/ensure-test-db.mjs
+
+# 2. .env に TEST_DATABASE_URL を設定（.env.example 参照）
+# TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/astro_webauthn_test?schema=public"
+
+# 3. Prisma Client（未生成の場合）
+pnpm db:generate
+
+# 4. 実行（初回に migrate deploy が走る）
+pnpm test:integration
+```
+
+`TEST_DATABASE_URL` 未設定のときは分かりやすいエラーで失敗します。開発用 `DATABASE_URL` とは別 DB を使ってください。
+
+単体と統合をまとめて実行する場合:
+
+```bash
+pnpm test:all
+```
+
+対象:
+
+- `src/server/api/auth.integration.test.ts` — パスワードログイン、セッション、ログアウト、再設定リクエスト
+- `src/server/api/posts.integration.test.ts` — パスキー未登録 403 / フィクスチャありで一覧 200
 
 ## 静的チェック
 
