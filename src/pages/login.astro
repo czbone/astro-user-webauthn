@@ -1,0 +1,19 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import LoginForm from '@/components/LoginForm'
+import { getPageSession } from '@/lib/auth-page'
+
+const session = await getPageSession(Astro.cookies)
+if (session) {
+  if (session.user.mustSetupPasskey) {
+    return Astro.redirect('/setup-passkey')
+  }
+  return Astro.redirect(session.user.role === 'admin' ? '/dashboard' : '/posts')
+}
+---
+
+<Layout title="ログイン">
+  <main class="mx-auto max-w-3xl px-4 py-10">
+    <LoginForm client:load />
+  </main>
+</Layout>

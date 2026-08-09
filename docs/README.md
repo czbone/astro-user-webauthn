@@ -1,0 +1,9 @@
+# ドキュメント
+
+| ファイル | 内容 |
+|----------|------|
+| [specification.md](./specification.md) | 本アプリの確定仕様（認証・権限・API・環境変数） |
+| [session-management.md](./session-management.md) | セッション管理の詳細仕様 |
+| [testing.md](./testing.md) | テスト方法（`pnpm test`・静的チェック・手動検証） |
+
+補足の下書きは `planning/specification.txt` にも残していますが、実装の正本は本ディレクトリです。

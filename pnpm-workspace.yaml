@@ -1,0 +1,27 @@
+allowBuilds:
+  '@prisma/engines': true
+  bcrypt: set this to true or false
+  esbuild: true
+  prisma: true
+  sharp: true
+minimumReleaseAgeExclude:
+  - tsx@4.22.4 || 4.23.9
+  - '@types/react@19.2.16'
+  - '@typescript-eslint/eslint-plugin@8.60.1'
+  - '@typescript-eslint/parser@8.60.1'
+  - '@typescript-eslint/project-service@8.60.1'
+  - '@typescript-eslint/scope-manager@8.60.1'
+  - '@typescript-eslint/tsconfig-utils@8.60.1'
+  - '@typescript-eslint/type-utils@8.60.1'
+  - '@typescript-eslint/types@8.60.1'
+  - '@typescript-eslint/typescript-estree@8.60.1'
+  - '@typescript-eslint/utils@8.60.1'
+  - '@typescript-eslint/visitor-keys@8.60.1'
+  - react-dom@19.2.7
+  - react@19.2.7
+  - typescript-eslint@8.60.1
+  - '@astrojs/node@10.1.3 || 11.1.0'
+  - '@astrojs/react@5.0.7'
+  - astro@6.4.3 || 7.2.0
+  - pg-protocol@1.16.0
+  - pg@8.23.0
