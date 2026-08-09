@@ -16,7 +16,11 @@ export const authEnv = {
 }
 
 export const SESSION_COOKIE = 'session'
-export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
+
+const parsedMaxAge = Number.parseInt(process.env.SESSION_MAX_AGE_SECONDS || '', 10)
+export const SESSION_MAX_AGE_SECONDS =
+  Number.isFinite(parsedMaxAge) && parsedMaxAge > 0 ? parsedMaxAge : 60 * 60 * 24 * 30
 export const SESSION_MAX_AGE_MS = SESSION_MAX_AGE_SECONDS * 1000
+
 export const DEVICE_INVITE_TTL_MS = 60 * 60 * 1000
 export const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000

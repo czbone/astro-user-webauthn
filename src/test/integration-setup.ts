@@ -9,6 +9,9 @@ if (!testDatabaseUrl) {
 }
 
 process.env.DATABASE_URL = testDatabaseUrl
+process.env.REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379/'
+process.env.REDIS_KEY_PREFIX =
+  process.env.REDIS_KEY_PREFIX || `astro-webauthn-test:${process.pid}:`
 
 vi.mock('@/server/auth/mail', () => ({
   sendPasswordResetMail: vi.fn(),

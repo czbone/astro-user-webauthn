@@ -29,12 +29,13 @@ devices.post('/register/options', async (c) => {
       return c.json({ error: '招待が無効または期限切れです' }, 400)
     }
 
-    const options = await createRegistrationOptions(
-      invite.userId,
-      invite.user.email,
-      invite.user.name
-    )
-    return c.json({ options, email: invite.user.email, name: invite.user.name }, 200)
+    const user = await UserDB.findById(invite.userId)
+    if (!user) {
+      return c.json({ error: '招待が無効または期限切れです' }, 400)
+    }
+
+    const options = await createRegistrationOptions(user.id, user.email, user.name)
+    return c.json({ options, email: user.email, name: user.name }, 200)
   } catch (error) {
     console.error('デバイス登録オプションエラー:', error)
     return c.json({ error: 'デバイス登録の開始に失敗しました' }, 500)
@@ -52,13 +53,14 @@ devices.post('/register/verify', async (c) => {
       return c.json({ error: '招待トークンと登録レスポンスが必要です' }, 400)
     }
 
-    const invite = await InviteDB.findValidByTokenHash(hashToken(token))
+    const tokenHash = hashToken(token)
+    const invite = await InviteDB.findValidByTokenHash(tokenHash)
     if (!invite) {
       return c.json({ error: '招待が無効または期限切れです' }, 400)
     }
 
     await verifyRegistration(invite.userId, response, deviceName)
-    await InviteDB.markUsed(invite.id)
+    await InviteDB.markUsed(tokenHash)
 
     return c.json({ ok: true }, 200)
   } catch (error) {
@@ -141,7 +143,7 @@ devices.post('/reauth/verify', requireAuth, requirePasskey, async (c) => {
 devices.post('/invite', requireAuth, requirePasskey, async (c) => {
   try {
     const user = c.get('user')
-    if (!consumeReauth(user.id)) {
+    if (!(await consumeReauth(user.id))) {
       return c.json({ error: 'デバイス追加には再認証が必要です' }, 403)
     }
 

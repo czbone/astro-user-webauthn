@@ -1,13 +1,15 @@
 # WebAuthn ユーザー認証アプリケーション仕様
 
-本ドキュメントは本プロジェクトの確定仕様です。セッション管理の詳細は [session-management.md](./session-management.md) も参照してください。
+本ドキュメントは本プロジェクトの確定仕様です。セッション管理の詳細は [session-management.md](./session-management.md)、Redis キー設計は [redis.md](./redis.md) を参照してください。
 
 ## 概要
 
-Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + React Islands による、管理者招待制の WebAuthn（パスキー）認証アプリです。
+Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + Redis + React Islands による、管理者招待制の WebAuthn（パスキー）認証アプリです。
 
 - 初回は仮パスワードでログインし、パスキー登録後はパスキーのみでログインする
-- セッションは Cookie + DB（30日スライディング）
+- セッションは Cookie + Redis（30日スライディング）
+- WebAuthn challenge・レート制限・デバイス招待・パスワード再設定トークンも Redis
+- 永続ドメインデータ（User / Credential / Post）は PostgreSQL
 - デバイス追加・パスワード再設定・ユーザー招待はメール連携（`MAIL_MODE` で切替）
 
 ## 認証フロー
@@ -46,14 +48,21 @@ Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + React Islands による、管�
 
 ## データモデル
 
+### PostgreSQL（永続）
+
 - `User`: id(UUID), email, password(scrypt ハッシュ), name, role
 - `WebAuthnCredential`: credentialId, publicKey, counter, transports, deviceName
-- `Session`: tokenHash, createdAt, lastUsedAt, revokedAt
-- `DeviceInvite`: tokenHash, expiresAt, usedAt
-- `PasswordReset`: tokenHash, expiresAt, usedAt
 - `Post`: title, content, published, authorId
 
-Session / Invite / Reset のトークンは生値を Cookie・URL・メールにのみ載せ、DB には SHA-256 ハッシュを保存する。
+### Redis（短命・セッション）
+
+- Session: `sess:{tokenHash}`（値: id, userId, createdAt）+ `sess:user:{userId}` 索引
+- DeviceInvite: `invite:{tokenHash}` + `invite:user:{userId}` 索引（TTL 1h）
+- PasswordReset: `reset:{tokenHash}` + `reset:user:{userId}` 索引（TTL 1h）
+- WebAuthn challenge / reauth-ok: `chal:*`（TTL 5分、消費型）
+- Rate limit: `rl:*`（固定ウィンドウ）
+
+Session / Invite / Reset のトークンは生値を Cookie・URL・メールにのみ載せ、Redis キーには SHA-256 ハッシュを用いる。使用済みはキー削除とし、`usedAt` / `revokedAt` は持たない。
 
 ## セッション
 
@@ -61,9 +70,12 @@ Session / Invite / Reset のトークンは生値を Cookie・URL・メールに
 |------|------|
 | Cookie 名 | `session` |
 | 属性 | HttpOnly / SameSite=Lax / Path=/ / Max-Age=2592000（Secure は本番のみ） |
-| 方式 | 永続 Cookie + DB 検証、スライディング 30 日 |
-| Session ID | 通常アクセスでは変更しない（期限と lastUsedAt のみ更新） |
-| ログアウト | Cookie 削除 + 当該 Session の revokedAt（他デバイス非影響） |
+| 方式 | 永続 Cookie + Redis 検証、スライディング 30 日 |
+| Token | 通常アクセスでは変更しない（Cookie Max-Age と Redis TTL のみ更新） |
+| ログアウト | Cookie 削除 + 当該 Session キー削除（他デバイス非影響） |
+| 全失効 | `sess:user:{userId}` 経由で全キー削除（パスワード再設定時） |
+
+詳細は [session-management.md](./session-management.md)。
 
 ## メール
 
@@ -102,15 +114,20 @@ Session / Invite / Reset のトークンは生値を Cookie・URL・メールに
 ## 環境変数
 
 - `DATABASE_URL`
+- `REDIS_URL`（本番必須、既定 `redis://localhost:6379/`）
+- `REDIS_KEY_PREFIX`（任意）
+- `SESSION_MAX_AGE_SECONDS`（任意、既定 `2592000`）
 - `WEBAUTHN_RP_ID` / `WEBAUTHN_RP_NAME` / `WEBAUTHN_ORIGIN`
 - `APP_URL`
 - `MAIL_MODE` / `SMTP_*`
 - `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`
 
+詳細は [redis.md](./redis.md)。
+
 ## セキュリティ上の必須事項
 
 - DeviceInvite / PasswordReset は短命・単回使用（目安: デバイス招待 1h、再設定 1h）
-- ログイン・再設定リクエストに簡易レート制限
+- ログイン・再設定リクエストに簡易レート制限（Redis 固定ウィンドウ）
 - パスキー未設定セッションは setup / logout / me 以外を拒否
 - 2台目以降のパスキーは再認証＋メール招待のみ
 - パスワード再設定 UI で「全パスキー無効化」を警告表示
@@ -120,3 +137,4 @@ Session / Invite / Reset のトークンは生値を Cookie・URL・メールに
 
 - メール受信箱の侵害はアカウント掌握につながる（メール側保護が前提）
 - パスワード再設定は1台紛失でも全パスキーをリセットする（安全側）
+- 招待・再設定リンクの可用性は Redis の永続化設定に依存する（Redis 再起動・データ消失で未使用トークンは無効になる）

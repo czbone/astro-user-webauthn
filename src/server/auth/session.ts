@@ -2,7 +2,6 @@ import type { Context } from 'hono'
 import type { AstroCookies } from 'astro'
 import {
   SESSION_COOKIE,
-  SESSION_MAX_AGE_MS,
   SESSION_MAX_AGE_SECONDS,
   authEnv
 } from '@/server/auth/env'
@@ -20,6 +19,7 @@ export type ResolvedSession = {
   sessionId: string
   user: AuthUser
   token: string
+  tokenHash: string
 }
 
 export function setSessionCookie(
@@ -54,25 +54,33 @@ export async function createSession(userId: string): Promise<{ token: string; se
 export async function resolveSessionFromToken(token: string | undefined | null): Promise<ResolvedSession | null> {
   if (!token) return null
 
-  const session = await SessionDB.findValidByTokenHash(hashToken(token), SESSION_MAX_AGE_MS)
+  const tokenHash = hashToken(token)
+  const session = await SessionDB.findValidByTokenHash(tokenHash)
   if (!session) return null
+
+  const userRow = await UserDB.findById(session.userId)
+  if (!userRow) {
+    await SessionDB.revoke(tokenHash)
+    return null
+  }
 
   const credentialCount = await UserDB.countCredentials(session.userId)
   const user: AuthUser = {
-    id: session.user.id,
-    email: session.user.email,
-    name: session.user.name,
-    role: session.user.role as 'admin' | 'user',
+    id: userRow.id,
+    email: userRow.email,
+    name: userRow.name,
+    role: userRow.role as 'admin' | 'user',
     hasPasskey: credentialCount > 0,
     mustSetupPasskey: credentialCount === 0
   }
 
-  await SessionDB.touch(session.id)
+  await SessionDB.touch(tokenHash, session.userId)
 
   return {
     sessionId: session.id,
     user,
-    token
+    token,
+    tokenHash
   }
 }
 
@@ -107,4 +115,8 @@ export async function resolveSessionFromHono(c: Context): Promise<ResolvedSessio
   return resolved
 }
 
-export { clearSessionCookieOnContext, setSessionCookieOnContext }
+export {
+  clearSessionCookieOnContext,
+  getSessionTokenFromRequest,
+  setSessionCookieOnContext
+}

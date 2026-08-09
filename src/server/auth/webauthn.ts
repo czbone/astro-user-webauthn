@@ -68,7 +68,7 @@ export async function createRegistrationOptions(userId: string, email: string, n
     }
   })
 
-  saveChallenge('reg', options.challenge, userId)
+  await saveChallenge('reg', options.challenge, userId)
   return options
 }
 
@@ -77,7 +77,7 @@ export async function verifyRegistration(
   response: RegistrationResponseJSON,
   deviceName?: string
 ) {
-  const expected = takeChallenge('reg', userId)
+  const expected = await takeChallenge('reg', userId)
   if (!expected) {
     throw new Error('登録チャレンジが見つかりません')
   }
@@ -114,7 +114,7 @@ export async function createAuthenticationOptions(email: string) {
       rpID: rp().rpID,
       userVerification: 'preferred'
     })
-    saveChallenge('auth', options.challenge)
+    await saveChallenge('auth', options.challenge)
     return { options, userExists: false as const, hasPasskey: false as const }
   }
 
@@ -124,7 +124,7 @@ export async function createAuthenticationOptions(email: string) {
       rpID: rp().rpID,
       userVerification: 'preferred'
     })
-    saveChallenge('auth', options.challenge, user.id)
+    await saveChallenge('auth', options.challenge, user.id)
     return {
       options,
       userExists: true as const,
@@ -139,7 +139,7 @@ export async function createAuthenticationOptions(email: string) {
     allowCredentials: credentials.map(toCredentialDescriptor)
   })
 
-  saveChallenge('auth', options.challenge, user.id)
+  await saveChallenge('auth', options.challenge, user.id)
   return {
     options,
     userExists: true as const,
@@ -156,8 +156,8 @@ export async function verifyAuthentication(response: AuthenticationResponseJSON)
 
   const challengeFromClient = extractChallengeFromClientData(response.response.clientDataJSON)
   const expected =
-    (challengeFromClient && takeAuthChallengeByValue(challengeFromClient)) ||
-    takeAuthChallengeForUser(credential.userId)
+    (challengeFromClient && (await takeAuthChallengeByValue(challengeFromClient))) ||
+    (await takeAuthChallengeForUser(credential.userId))
 
   if (!expected) {
     throw new Error('認証チャレンジが見つかりません')
@@ -197,12 +197,12 @@ export async function createReauthOptions(userId: string) {
     allowCredentials: credentials.map(toCredentialDescriptor)
   })
 
-  saveChallenge('reauth', options.challenge, userId)
+  await saveChallenge('reauth', options.challenge, userId)
   return options
 }
 
 export async function verifyReauth(userId: string, response: AuthenticationResponseJSON) {
-  const expected = takeChallenge('reauth', userId)
+  const expected = await takeChallenge('reauth', userId)
   if (!expected) {
     throw new Error('再認証チャレンジが見つかりません')
   }
@@ -231,10 +231,10 @@ export async function verifyReauth(userId: string, response: AuthenticationRespo
   }
 
   await CredentialDB.updateCounter(credential.id, BigInt(verification.authenticationInfo.newCounter))
-  saveChallenge('reauth-ok', '1', userId)
+  await saveChallenge('reauth-ok', '1', userId)
   return verification
 }
 
-export function consumeReauth(userId: string): boolean {
-  return Boolean(takeChallenge('reauth-ok', userId))
+export async function consumeReauth(userId: string): Promise<boolean> {
+  return Boolean(await takeChallenge('reauth-ok', userId))
 }

@@ -1,6 +1,6 @@
 # セッション管理仕様
 
-本ファイルは `planning/specification.txt` の内容をドキュメントとして整理したものです。
+本ファイルはセッションと短命データの管理仕様です。Redis キー設計の詳細は [redis.md](./redis.md) を参照してください。
 
 ## 1. 認証方式
 
@@ -18,7 +18,14 @@ WebAuthn Credential
 
 WebAuthn の Credential と Session は別物として管理します。
 
-## 2. ログイン時
+## 2. ストアの役割
+
+| ストア | 対象 |
+|--------|------|
+| PostgreSQL | `User`, `WebAuthnCredential`, `Post` |
+| Redis | Session、WebAuthn challenge / reauth-ok、Rate limit、DeviceInvite、PasswordReset |
+
+## 3. ログイン時
 
 認証に成功したら新しい Session を発行します。
 
@@ -29,25 +36,34 @@ User特定
     ↓
 ランダムな Session Token 生成
     ↓
-DB に Token のハッシュを保存
+Token の SHA-256 ハッシュをキーに Redis へ保存
+    ↓
+ユーザー索引 SET に tokenHash を追加
     ↓
 Cookie 発行
 ```
 
 - Session Token は暗号学的に安全な乱数から生成する
-- DB には生の Token ではなくハッシュを保存する
+- Redis には生の Token ではなく、そのハッシュをキーとして用いる
+- Cookie 署名は用いない（高エントロピートークン + ハッシュ照合）
 
-```text
-Session
-├─ id
-├─ userId
-├─ tokenHash
-├─ createdAt
-├─ lastUsedAt
-└─ revokedAt
+### Redis 上のセッション値
+
+キー: `sess:{tokenHash}`
+
+```json
+{
+  "id": "<uuid>",
+  "userId": "<uuid>",
+  "createdAt": "<ISO8601>"
+}
 ```
 
-## 3. セッション Cookie
+ユーザー索引: `sess:user:{userId}` = Redis SET（要素は `tokenHash`）。パスワード再設定時の全セッション失効に使う。
+
+セッション値にユーザースナップショットは載せない。ロールやパスキー有無はリクエストごとに PostgreSQL から解決する。
+
+## 4. セッション Cookie
 
 永続 Cookie とします。
 
@@ -59,36 +75,71 @@ Path=/
 Max-Age=2592000
 ```
 
-`Max-Age=2592000` は 30 日です。ブラウザを閉じても Cookie は残ります。
+`Max-Age` の既定は 30 日（`SESSION_MAX_AGE_SECONDS`、未設定時 `2592000`）。ブラウザを閉じても Cookie は残ります。
 
-## 4. セッションの有効期間
+| 項目 | 仕様 |
+|------|------|
+| Cookie 名 | `session` |
+| 値 | 暗号学的乱数トークン |
+| 方式 | 永続 Cookie + Redis 検証、スライディング 30 日 |
+
+## 5. セッションの有効期間
 
 スライディング方式です。最後にアクセスしてから 30 日間アクセスがなければログインを要求します。
 
-通常アクセスでは Session ID 自体は変更せず、Cookie の有効期限と `lastUsedAt` のみ更新します。
+通常アクセスでは Token 自体は変更せず、Cookie の Max-Age と Redis キーの TTL（`EXPIRE`）のみ更新します。`revokedAt` は用いず、キー削除が失効です。
 
-## 5. サーバー側検証
+## 6. サーバー側検証
 
-Cookie だけを信頼せず、リクエストごとに DB で Session を検証します。
+Cookie だけを信頼せず、リクエストごとに Redis で Session を検証します。
 
 ```text
-Cookie
+Cookie token
   ↓
-Session検索
+SHA-256 ハッシュ化
   ↓
-revokedAt を確認
+GET sess:{hash}
   ↓
-lastUsedAt を確認
-  ↓
-30日以上経過？
-  ├─ YES → Session無効 → ログイン要求
-  └─ NO  → 認証済み
+無し / TTL 切れ？
+  ├─ YES → 未認証 → ログイン要求
+  └─ NO
+       ↓
+     userId で PostgreSQL から User 取得（hasPasskey 等を算出）
+       ↓
+     EXPIRE（TTL 延長）+ Cookie Max-Age 再設定
+       ↓
+     認証済み
 ```
 
-## 6. ログアウト
+## 7. ログアウト
 
-Cookie 削除と、DB 上の当該 Session の失効（`revokedAt`）を行います。他デバイスの Session には影響しません。
+Cookie 削除と、当該 Session の Redis キー削除（`DEL sess:{tokenHash}` + 索引からの `SREM`）を行います。他デバイスの Session には影響しません。
 
-## 7. 複数デバイス
+## 8. 全セッション失効
+
+パスワード再設定完了時など:
+
+```text
+SMEMBERS sess:user:{userId}
+  ↓
+各 sess:{tokenHash} を DEL
+  ↓
+sess:user:{userId} を DEL
+  ↓
+必要なら新 Session を発行
+```
+
+## 9. 複数デバイス
 
 ユーザーは複数の WebAuthn Credential と複数の Session を持てます。デバイス追加はメール招待方式とし、招待発行時は既存 WebAuthn による再認証を要求します。
+
+## 10. 短命データ（概要）
+
+いずれも Redis に保存し、TTL で自動失効します。詳細は [redis.md](./redis.md)。
+
+| データ | TTL | 備考 |
+|--------|-----|------|
+| WebAuthn challenge / reauth-ok | 300 秒 | 消費型（GET + DEL） |
+| Rate limit | ウィンドウごと（例: 15 分） | 固定ウィンドウ、`INCR` + `EXPIRE` |
+| DeviceInvite | 3600 秒 | 単回使用、ユーザー索引 SET あり |
+| PasswordReset | 3600 秒 | 単回使用、ユーザー索引 SET あり |

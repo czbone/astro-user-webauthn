@@ -1,14 +1,14 @@
 # Astro User WebAuthn
 
-Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL による、管理者招待制のパスキー（WebAuthn）認証アプリケーションです。
+Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + Redis による、管理者招待制のパスキー（WebAuthn）認証アプリケーションです。
 
-詳細仕様は [`docs/specification.md`](docs/specification.md) と [`docs/session-management.md`](docs/session-management.md) を参照してください。テスト方法は [`docs/testing.md`](docs/testing.md) を参照してください。
+詳細仕様は [`docs/specification.md`](docs/specification.md)、[`docs/session-management.md`](docs/session-management.md)、[`docs/redis.md`](docs/redis.md) を参照してください。テスト方法は [`docs/testing.md`](docs/testing.md) を参照してください。
 
 ## 主な機能
 
 - 管理者招待（仮パスワード自動生成＋メール通知）
 - 初回パスワードログイン → パスキー必須登録 → 以降パスキーログイン
-- セッション（Cookie + DB、30日スライディング）
+- セッション（Cookie + Redis、30日スライディング）
 - デバイス追加（再認証＋メール招待）
 - パスワード再設定（全パスキー削除＋全 Session 失効）
 - 投稿（公開は全員閲覧、書き込みは本人のみ）
@@ -19,6 +19,7 @@ Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL による、管理者招待制の
 - Astro 7（SSR / Node adapter / Advanced routing）
 - Hono
 - Prisma 7 + PostgreSQL
+- Redis（ioredis）— セッション・challenge・レート制限・招待／再設定トークン
 - React 19 Islands
 - Tailwind CSS 4
 - `@simplewebauthn/server` / `@simplewebauthn/browser`
@@ -38,6 +39,7 @@ pnpm install
 
 ```env
 DATABASE_URL="postgresql://username:password@localhost:5432/database_name?schema=public"
+REDIS_URL="redis://localhost:6379/"
 APP_URL="http://localhost:3000"
 WEBAUTHN_RP_ID="localhost"
 WEBAUTHN_RP_NAME="Astro User WebAuthn"
@@ -47,7 +49,14 @@ SEED_ADMIN_EMAIL="admin@example.com"
 SEED_ADMIN_PASSWORD="admin-change-me"
 ```
 
-### 3. DB 初期化
+### 3. PostgreSQL / Redis 起動
+
+```bash
+# テスト用 compose に Postgres + Redis が含まれます（ローカル開発でも利用可）
+docker compose -f docker-compose.db.yaml up -d
+```
+
+### 4. DB 初期化
 
 ```bash
 pnpm db:generate
@@ -55,7 +64,7 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-### 4. 開発サーバー
+### 5. 開発サーバー
 
 ```bash
 pnpm dev
@@ -90,7 +99,7 @@ pnpm dev
 1. `src/fetch.ts` — `middleware()` → `/api`（Hono）→ `pages()`
 2. Cookie は `App.getSetCookieFromResponse()` で明示付与
 3. ブラウザ API は `src/api-client` 経由
-4. DB アクセスは `src/server/db` 経由
+4. 永続データは `src/server/db`（Prisma）、セッション等の短命データは Redis（`src/lib/redis.ts`）
 
 ## テスト
 
@@ -104,11 +113,12 @@ pnpm test
 
 Vitest で純関数テストと API スモーク（DB モック）を実行します。ウォッチ実行は `pnpm test:watch` です。
 
-実 PostgreSQL を使う統合テスト:
+実 PostgreSQL + Redis を使う統合テスト:
 
 ```bash
 docker compose -f docker-compose.db.yaml up -d
 # .env に TEST_DATABASE_URL を設定（.env.example 参照）
+# REDIS_URL 未設定時は redis://localhost:6379/ を使用
 pnpm test:integration
 ```
 

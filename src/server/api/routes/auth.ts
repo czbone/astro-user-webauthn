@@ -7,6 +7,7 @@ import { checkRateLimit } from '@/server/auth/rate-limit'
 import {
   clearSessionCookieOnContext,
   createSession,
+  getSessionTokenFromRequest,
   setSessionCookieOnContext
 } from '@/server/auth/session'
 import { generateToken, hashToken } from '@/server/auth/tokens'
@@ -38,7 +39,7 @@ auth.post('/login/password', async (c) => {
     const email = String(body.email || '').trim().toLowerCase()
     const password = String(body.password || '')
     const ip = c.req.header('x-forwarded-for') || 'local'
-    const limited = checkRateLimit(`pwd:${ip}:${email}`, 10, 15 * 60 * 1000)
+    const limited = await checkRateLimit(`pwd:${ip}:${email}`, 10, 15 * 60 * 1000)
     if (!limited.ok) {
       return c.json({ error: '試行回数が多すぎます。しばらくしてから再試行してください' }, 429)
     }
@@ -90,7 +91,7 @@ auth.post('/login/method', async (c) => {
     const body = await c.req.json()
     const email = String(body.email || '').trim().toLowerCase()
     const ip = c.req.header('x-forwarded-for') || 'local'
-    const limited = checkRateLimit(`method:${ip}:${email}`, 30, 15 * 60 * 1000)
+    const limited = await checkRateLimit(`method:${ip}:${email}`, 30, 15 * 60 * 1000)
     if (!limited.ok) {
       return c.json({ error: '試行回数が多すぎます' }, 429)
     }
@@ -216,7 +217,7 @@ auth.post('/password-reset/request', async (c) => {
     const body = await c.req.json()
     const email = String(body.email || '').trim().toLowerCase()
     const ip = c.req.header('x-forwarded-for') || 'local'
-    const limited = checkRateLimit(`reset:${ip}:${email}`, 5, 15 * 60 * 1000)
+    const limited = await checkRateLimit(`reset:${ip}:${email}`, 5, 15 * 60 * 1000)
     if (!limited.ok) {
       return c.json(generic, 200)
     }
@@ -258,7 +259,8 @@ auth.post('/password-reset/confirm', async (c) => {
       return c.json({ error: 'トークンと8文字以上のパスワードが必要です' }, 400)
     }
 
-    const reset = await PasswordResetDB.findValidByTokenHash(hashToken(token))
+    const tokenHash = hashToken(token)
+    const reset = await PasswordResetDB.findValidByTokenHash(tokenHash)
     if (!reset) {
       return c.json({ error: '再設定リンクが無効または期限切れです' }, 400)
     }
@@ -269,7 +271,6 @@ auth.post('/password-reset/confirm', async (c) => {
     await SessionDB.revokeAllForUser(reset.userId)
     await InviteDB.invalidatePendingForUser(reset.userId)
     await PasswordResetDB.invalidatePendingForUser(reset.userId)
-    await PasswordResetDB.markUsed(reset.id)
 
     const { token: sessionToken } = await createSession(reset.userId)
     setSessionCookieOnContext(c, sessionToken)
@@ -283,8 +284,10 @@ auth.post('/password-reset/confirm', async (c) => {
 
 auth.post('/logout', requireAuth, async (c) => {
   try {
-    const sessionId = c.get('sessionId')
-    await SessionDB.revoke(sessionId)
+    const token = getSessionTokenFromRequest(c)
+    if (token) {
+      await SessionDB.revoke(hashToken(token))
+    }
     clearSessionCookieOnContext(c)
     return c.json({ ok: true }, 200)
   } catch (error) {

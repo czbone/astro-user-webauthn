@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import app from '@/server/api/app'
-import { prisma } from '@/lib/prisma'
 import { sendPasswordResetMail } from '@/server/auth/mail'
+import { hashToken } from '@/server/auth/tokens'
+import SessionDB from '@/server/db/session'
+import PasswordResetDB from '@/server/db/password-reset'
 import {
   createTestUser,
   resetDatabase,
@@ -27,9 +29,9 @@ describe('auth integration', () => {
     const token = sessionCookieFromResponse(res)
     expect(token).toBeTruthy()
 
-    const sessions = await prisma.session.findMany({ where: { userId: user.id } })
-    expect(sessions).toHaveLength(1)
-    expect(sessions[0]?.revokedAt).toBeNull()
+    const session = await SessionDB.findValidByTokenHash(hashToken(token!))
+    expect(session).toMatchObject({ userId: user.id })
+    expect(await SessionDB.countForUser(user.id)).toBe(1)
 
     const body = await res.json()
     expect(body.user).toMatchObject({
@@ -80,9 +82,8 @@ describe('auth integration', () => {
     })
     expect(logoutRes.status).toBe(200)
 
-    const sessions = await prisma.session.findMany({ where: { userId: user.id } })
-    expect(sessions).toHaveLength(1)
-    expect(sessions[0]?.revokedAt).not.toBeNull()
+    expect(await SessionDB.findValidByTokenHash(hashToken(token!))).toBeNull()
+    expect(await SessionDB.countForUser(user.id)).toBe(0)
 
     const meRes = await app.request('/auth/me', {
       headers: { Cookie: `session=${encodeURIComponent(token!)}` }
@@ -91,7 +92,7 @@ describe('auth integration', () => {
     await expect(meRes.json()).resolves.toEqual({ user: null })
   })
 
-  it('creates a password reset row when the user exists', async () => {
+  it('creates a password reset record when the user exists', async () => {
     const { email, user } = await createTestUser()
 
     const res = await app.request('/auth/password-reset/request', {
@@ -101,8 +102,7 @@ describe('auth integration', () => {
     })
 
     expect(res.status).toBe(200)
-    const resets = await prisma.passwordReset.findMany({ where: { userId: user.id } })
-    expect(resets).toHaveLength(1)
+    expect(await PasswordResetDB.countForUser(user.id)).toBe(1)
     expect(sendPasswordResetMail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: user.email,
@@ -112,7 +112,7 @@ describe('auth integration', () => {
   })
 
   it('rejects wrong passwords without creating a session', async () => {
-    const { email } = await createTestUser()
+    const { email, user } = await createTestUser()
 
     const res = await app.request('/auth/login/password', {
       method: 'POST',
@@ -121,6 +121,6 @@ describe('auth integration', () => {
     })
 
     expect(res.status).toBe(401)
-    await expect(prisma.session.count()).resolves.toBe(0)
+    expect(await SessionDB.countForUser(user.id)).toBe(0)
   })
 })

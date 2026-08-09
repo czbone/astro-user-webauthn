@@ -1,30 +1,25 @@
-type Bucket = {
-  count: number
-  resetAt: number
-}
+import { redis } from '@/lib/redis'
+import { RedisKeys } from '@/server/redis/keys'
 
-const buckets = new Map<string, Bucket>()
-
-export function checkRateLimit(
+export async function checkRateLimit(
   key: string,
   limit: number,
   windowMs: number
-): { ok: true } | { ok: false; retryAfterSec: number } {
-  const now = Date.now()
-  const current = buckets.get(key)
+): Promise<{ ok: true } | { ok: false; retryAfterSec: number }> {
+  const redisKey = RedisKeys.rateLimit(key)
+  const count = await redis.incr(redisKey)
 
-  if (!current || current.resetAt <= now) {
-    buckets.set(key, { count: 1, resetAt: now + windowMs })
-    return { ok: true }
+  if (count === 1) {
+    await redis.pexpire(redisKey, windowMs)
   }
 
-  if (current.count >= limit) {
+  if (count > limit) {
+    const pttl = await redis.pttl(redisKey)
     return {
       ok: false,
-      retryAfterSec: Math.max(1, Math.ceil((current.resetAt - now) / 1000))
+      retryAfterSec: Math.max(1, Math.ceil(Math.max(pttl, 0) / 1000))
     }
   }
 
-  current.count += 1
   return { ok: true }
 }

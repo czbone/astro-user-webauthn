@@ -5,10 +5,7 @@ import { hashPassword } from '../src/server/auth/password'
 async function main() {
   console.log('初期データの挿入を開始します...')
 
-  await prisma.passwordReset.deleteMany()
-  await prisma.deviceInvite.deleteMany()
   await prisma.webAuthnCredential.deleteMany()
-  await prisma.session.deleteMany()
   await prisma.post.deleteMany()
   await prisma.user.deleteMany()
 

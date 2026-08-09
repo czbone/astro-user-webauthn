@@ -22,12 +22,12 @@ pnpm test:watch
 
 実 PostgreSQL / Playwright / パスキー UI は使いません。
 
-### 統合テスト（実 PostgreSQL）
+### 統合テスト（実 PostgreSQL + Redis）
 
-専用 DB（`TEST_DATABASE_URL`）に対して、モックなしで API + Prisma を検証します。パスキー登録セレモニー自体は対象外です（Credential 行のフィクスチャ挿入のみ）。
+専用 DB（`TEST_DATABASE_URL`）と Redis（`REDIS_URL`）に対して、モックなしで API + Prisma + Redis を検証します。パスキー登録セレモニー自体は対象外です（Credential 行のフィクスチャ挿入のみ）。
 
 ```bash
-# 1. テスト用 Postgres（Docker がある場合）
+# 1. テスト用 Postgres + Redis（Docker がある場合）
 docker compose -f docker-compose.db.yaml up -d
 
 # 既存のローカル Postgres を使う場合は、DATABASE_URL と同じ接続先に
@@ -36,6 +36,7 @@ docker compose -f docker-compose.db.yaml up -d
 
 # 2. .env に TEST_DATABASE_URL を設定（.env.example 参照）
 # TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/astro_webauthn_test?schema=public"
+# REDIS_URL 未設定時は redis://localhost:6379/ を使用
 
 # 3. Prisma Client（未生成の場合）
 pnpm db:generate
@@ -44,7 +45,7 @@ pnpm db:generate
 pnpm test:integration
 ```
 
-`TEST_DATABASE_URL` 未設定のときは分かりやすいエラーで失敗します。開発用 `DATABASE_URL` とは別 DB を使ってください。
+`TEST_DATABASE_URL` 未設定のときは分かりやすいエラーで失敗します。開発用 `DATABASE_URL` とは別 DB を使ってください。統合テストは `REDIS_KEY_PREFIX` を自動設定し、テスト間で Redis キーを掃除します。
 
 単体と統合をまとめて実行する場合:
 
@@ -73,7 +74,8 @@ pnpm build
 
 ```bash
 pnpm install
-# .env.example を .env にコピーして DATABASE_URL 等を設定
+# .env.example を .env にコピーして DATABASE_URL / REDIS_URL 等を設定
+docker compose -f docker-compose.db.yaml up -d
 pnpm db:generate
 pnpm db:migrate
 pnpm db:seed

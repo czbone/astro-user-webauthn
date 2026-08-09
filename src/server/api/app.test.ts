@@ -4,6 +4,45 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {}
 }))
 
+vi.mock('@/lib/redis', () => ({
+  redis: {
+    get: vi.fn(),
+    set: vi.fn(),
+    del: vi.fn(),
+    incr: vi.fn(),
+    expire: vi.fn(),
+    pexpire: vi.fn(),
+    pttl: vi.fn(),
+    sadd: vi.fn(),
+    srem: vi.fn(),
+    smembers: vi.fn(),
+    scard: vi.fn(),
+    pipeline: () => ({
+      set() {
+        return this
+      },
+      del() {
+        return this
+      },
+      sadd() {
+        return this
+      },
+      srem() {
+        return this
+      },
+      expire() {
+        return this
+      },
+      exec: vi.fn().mockResolvedValue([])
+    }),
+    on: vi.fn()
+  }
+}))
+
+vi.mock('@/server/auth/rate-limit', () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ ok: true })
+}))
+
 vi.mock('@/server/db', () => ({
   UserDB: {
     findByEmail: vi.fn(),
@@ -21,7 +60,8 @@ vi.mock('@/server/db', () => ({
     findValidByTokenHash: vi.fn(),
     create: vi.fn(),
     touch: vi.fn(),
-    deleteById: vi.fn()
+    revoke: vi.fn(),
+    revokeAllForUser: vi.fn()
   },
   CredentialDB: {},
   InviteDB: {},

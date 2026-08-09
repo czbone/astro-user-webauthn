@@ -55,9 +55,9 @@
 - ID は UUID（文字列）です。
 
 ## データモデルの前提
-- `User`: email unique, password(scrypt hash), name, role
-- `WebAuthnCredential` / `Session` / `DeviceInvite` / `PasswordReset` / `Post`
-- Session / Invite / Reset トークンは DB にハッシュのみ保存
+- PostgreSQL: `User`（email unique, password(scrypt hash), name, role）/ `WebAuthnCredential` / `Post`
+- Redis: Session / DeviceInvite / PasswordReset / WebAuthn challenge / rate limit（詳細は `docs/redis.md`）
+- Session / Invite / Reset トークンはクライアントに生値、Redis キーは SHA-256 ハッシュ
 
 ## 推奨コマンド
 - 開発: `pnpm dev`

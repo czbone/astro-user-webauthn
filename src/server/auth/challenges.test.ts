@@ -1,22 +1,36 @@
-import { describe, expect, it } from 'vitest'
-import { saveChallenge, takeChallenge } from '@/server/auth/challenges'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { memoryRedis } from '@/test/memory-redis'
+
+vi.mock('@/lib/redis', async () => {
+  const mod = await import('@/test/memory-redis')
+  return {
+    redis: mod.memoryRedis,
+    default: mod.memoryRedis
+  }
+})
+
+const { saveChallenge, takeChallenge } = await import('@/server/auth/challenges')
 
 describe('challenges', () => {
-  it('saves and consumes a challenge for a user', () => {
-    const userId = `user-${Date.now()}-${Math.random()}`
-    saveChallenge('register', 'challenge-value', userId)
+  beforeEach(() => {
+    memoryRedis.clear()
+  })
 
-    const first = takeChallenge('register', userId)
+  it('saves and consumes a challenge for a user', async () => {
+    const userId = `user-${Date.now()}-${Math.random()}`
+    await saveChallenge('register', 'challenge-value', userId)
+
+    const first = await takeChallenge('register', userId)
     expect(first).toMatchObject({
       challenge: 'challenge-value',
       kind: 'register',
       userId
     })
 
-    expect(takeChallenge('register', userId)).toBeNull()
+    expect(await takeChallenge('register', userId)).toBeNull()
   })
 
-  it('returns null when no challenge exists', () => {
-    expect(takeChallenge('register', `missing-${Date.now()}`)).toBeNull()
+  it('returns null when no challenge exists', async () => {
+    expect(await takeChallenge('register', `missing-${Date.now()}`)).toBeNull()
   })
 })
