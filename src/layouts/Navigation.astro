@@ -3,7 +3,8 @@ import LogoutButton from '@/components/LogoutButton'
 import { getPageSession } from '@/lib/auth-page'
 
 const currentPath = Astro.url.pathname
-const session = await getPageSession(Astro.cookies)
+// Layout 配下では Cookie を書き換えない（Astro はページ frontmatter 以外での set を拒否する）
+const session = await getPageSession(Astro.cookies, { refreshCookie: false })
 const user = session?.user
 ---
 

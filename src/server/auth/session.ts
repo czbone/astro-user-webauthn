@@ -76,10 +76,23 @@ export async function resolveSessionFromToken(token: string | undefined | null):
   }
 }
 
-export async function resolveSessionFromCookies(cookies: AstroCookies): Promise<ResolvedSession | null> {
+export type ResolveSessionFromCookiesOptions = {
+  /**
+   * Sliding session のため Cookie の Max-Age を延長する。
+   * Astro のページ frontmatter でのみ true にする（Layout / Navigation 等の
+   * インポート先コンポーネントでは false。レスポンス送信後の set は警告になる）。
+   */
+  refreshCookie?: boolean
+}
+
+export async function resolveSessionFromCookies(
+  cookies: AstroCookies,
+  options: ResolveSessionFromCookiesOptions = {}
+): Promise<ResolvedSession | null> {
+  const { refreshCookie = true } = options
   const token = cookies.get(SESSION_COOKIE)?.value
   const resolved = await resolveSessionFromToken(token)
-  if (resolved) {
+  if (resolved && refreshCookie) {
     setSessionCookie(cookies, resolved.token)
   }
   return resolved

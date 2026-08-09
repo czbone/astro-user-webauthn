@@ -1,8 +1,15 @@
 import type { AstroCookies } from 'astro'
-import { resolveSessionFromCookies, type ResolvedSession } from '@/server/auth/session'
+import {
+  resolveSessionFromCookies,
+  type ResolveSessionFromCookiesOptions,
+  type ResolvedSession
+} from '@/server/auth/session'
 
-export async function getPageSession(cookies: AstroCookies): Promise<ResolvedSession | null> {
-  return resolveSessionFromCookies(cookies)
+export async function getPageSession(
+  cookies: AstroCookies,
+  options?: ResolveSessionFromCookiesOptions
+): Promise<ResolvedSession | null> {
+  return resolveSessionFromCookies(cookies, options)
 }
 
 export function redirectForAuth(session: ResolvedSession | null, options?: {
