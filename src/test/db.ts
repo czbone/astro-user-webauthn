@@ -45,15 +45,23 @@ export async function createTestUser(input?: {
 }
 
 /** Fixture only — does not exercise WebAuthn registration. */
-export async function insertPasskeyFixture(userId: string) {
+export async function insertPasskeyFixture(
+  userId: string,
+  input?: { deviceName?: string }
+) {
   return prisma.webAuthnCredential.create({
     data: {
       userId,
       credentialId: `fixture-${randomBytes(16).toString('base64url')}`,
       publicKey: Buffer.from('integration-test-public-key'),
-      counter: 0n
+      counter: 0n,
+      deviceName: input?.deviceName ?? null
     }
   })
+}
+
+export function sessionCookieHeader(token: string): string {
+  return `session=${encodeURIComponent(token)}`
 }
 
 export function sessionCookieFromResponse(res: Response): string | null {

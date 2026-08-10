@@ -15,5 +15,6 @@ process.env.REDIS_KEY_PREFIX =
 
 vi.mock('@/server/auth/mail', () => ({
   sendPasswordResetMail: vi.fn(),
-  sendUserInviteMail: vi.fn()
+  sendUserInviteMail: vi.fn(),
+  sendDeviceInviteMail: vi.fn()
 }))
