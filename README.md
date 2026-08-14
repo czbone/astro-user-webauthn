@@ -6,8 +6,8 @@ Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + Redis による、管理者招�
 
 ## 主な機能
 
-- 管理者招待（仮パスワード自動生成＋メール通知）
-- 初回パスワードログイン → パスキー必須登録 → 以降パスキーログイン
+- 管理者招待（マジックリンク＋メール通知）
+- 初回マジックリンクログイン → パスキー必須登録 → 以降パスキーログイン
 - セッション（Cookie + Redis、30日スライディング）
 - デバイス追加（再認証＋メール招待）
 - パスワード再設定（全パスキー削除＋全 Session 失効）
@@ -19,7 +19,7 @@ Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + Redis による、管理者招�
 - Astro 7（SSR / Node adapter / Advanced routing）
 - Hono
 - Prisma 7 + PostgreSQL
-- Redis（ioredis）— セッション・challenge・レート制限・招待／再設定トークン
+- Redis（ioredis）— セッション・challenge・レート制限・招待／再設定／マジックリンクトークン
 - React 19 Islands
 - Tailwind CSS 4
 - `@simplewebauthn/server` / `@simplewebauthn/browser`
@@ -79,6 +79,7 @@ pnpm dev
 | パス | 説明 |
 |------|------|
 | `/login` | ログイン |
+| `/auth/link/[token]` | 招待マジックリンク確認 |
 | `/setup-passkey` | 初回パスキー登録 |
 | `/posts` | 投稿 |
 | `/devices` | デバイス管理 |

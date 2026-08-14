@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
-import { sendUserInviteMail } from '@/server/auth/mail'
-import { generateTemporaryPassword, hashPassword } from '@/server/auth/password'
+import { issueInviteMagicLink } from '@/server/auth/magic-link'
+import { hashPassword } from '@/server/auth/password'
+import { generateToken } from '@/server/auth/tokens'
 import { PostDB, UserDB } from '@/server/db'
 import { loadSession, requireAdmin } from '@/server/middleware/auth'
 import type { AppVariables } from '@/server/middleware/types'
@@ -59,8 +60,7 @@ admin.post('/users', async (c) => {
       return c.json({ error: 'このメールアドレスは既に登録されています' }, 409)
     }
 
-    const temporaryPassword = generateTemporaryPassword()
-    const passwordHash = await hashPassword(temporaryPassword)
+    const passwordHash = await hashPassword(generateToken())
     const user = await UserDB.create({
       email,
       name,
@@ -68,10 +68,11 @@ admin.post('/users', async (c) => {
       password: passwordHash
     })
 
-    await sendUserInviteMail({
-      to: user.email,
+    await issueInviteMagicLink({
+      userId: user.id,
+      email: user.email,
       name: user.name,
-      temporaryPassword
+      revokeSessions: false
     })
 
     return c.json(

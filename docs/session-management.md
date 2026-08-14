@@ -4,16 +4,16 @@
 
 ## 1. 認証方式
 
-認証には WebAuthn を使用します（初回のみパスワードログイン後にパスキーへ移行）。
+認証には WebAuthn を使用します（招待ユーザーは初回マジックリンク、seed 管理者は初回パスワードログイン後にパスキーへ移行）。
 
 ```text
-WebAuthn Credential
-        ↓
-    本人確認
+招待マジックリンク（または seed のパスワード）
         ↓
    Session発行
         ↓
-   Cookieに保存
+   パスキー登録
+        ↓
+以降は WebAuthn Credential でログイン
 ```
 
 WebAuthn の Credential と Session は別物として管理します。
@@ -23,7 +23,7 @@ WebAuthn の Credential と Session は別物として管理します。
 | ストア | 対象 |
 |--------|------|
 | PostgreSQL | `User`, `WebAuthnCredential`, `Post` |
-| Redis | Session、WebAuthn challenge / reauth-ok、Rate limit、DeviceInvite、PasswordReset |
+| Redis | Session、WebAuthn challenge / reauth-ok、Rate limit、DeviceInvite、PasswordReset、MagicLink |
 
 ## 3. ログイン時
 

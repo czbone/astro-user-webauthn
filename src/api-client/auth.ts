@@ -71,6 +71,27 @@ class AuthFetch {
     }
   }
 
+  async magicConsume(token: string) {
+    const res = await apiFetch('/auth/magic/consume', {
+      method: 'POST',
+      body: JSON.stringify({ token })
+    })
+    if (!res) return null
+    return {
+      response: res,
+      data: await readJson<{ ok?: boolean; redirectTo?: string; error?: string }>(res)
+    }
+  }
+
+  async magicResend(email: string) {
+    const res = await apiFetch('/auth/magic/resend', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    })
+    if (!res) return null
+    return { response: res, data: await readJson<{ message?: string }>(res) }
+  }
+
   async logout() {
     const res = await apiFetch('/auth/logout', { method: 'POST', body: '{}' })
     if (!res) return null

@@ -55,7 +55,7 @@ pnpm test:all
 
 対象:
 
-- `src/server/api/auth.integration.test.ts` — パスワードログイン、セッション、ログアウト、再設定リクエスト
+- `src/server/api/auth.integration.test.ts` — パスワード／マジックリンク、セッション、ログアウト、再設定リクエスト
 - `src/server/api/posts.integration.test.ts` — パスキー未登録 403 / フィクスチャありで一覧 200
 
 ## 静的チェック
@@ -92,7 +92,7 @@ WebAuthn はブラウザのパスキー UI が必要です（`localhost` + `WEBA
 
 | 流れ | 画面 / API |
 |------|------------|
-| 初回パスワードログイン → パスキー登録 | `/login` → `/setup-passkey` |
+| 初回マジックリンクログイン → パスキー登録 | `/auth/link/[token]` → `/setup-passkey` |
 | 以降のパスキーログイン | `/login` |
 | 管理者によるユーザー招待 | `/admin/users`（ログの招待リンク） |
 | デバイス追加 | `/devices` → `/invite/device/[token]` |

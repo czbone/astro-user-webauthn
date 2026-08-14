@@ -43,7 +43,7 @@ export default function AdminUsersSection() {
       setEmail('')
       setName('')
       setRole('user')
-      alert('ユーザーを作成し、仮パスワードをメール送信しました')
+      alert('ユーザーを作成し、ログイン用リンクをメール送信しました')
       await load()
     } finally {
       setLoading(false)
@@ -91,7 +91,7 @@ export default function AdminUsersSection() {
           disabled={loading}
           className="rounded bg-gray-800 px-4 py-2 text-white hover:bg-gray-700 disabled:opacity-50"
         >
-          仮パスワードを生成して招待
+          ログイン用リンクを送って招待
         </button>
       </form>
 

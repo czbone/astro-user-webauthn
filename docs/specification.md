@@ -6,25 +6,25 @@
 
 Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + Redis + React Islands による、管理者招待制の WebAuthn（パスキー）認証アプリです。
 
-- 初回は仮パスワードでログインし、パスキー登録後はパスキーのみでログインする
+- 初回は招待マジックリンクでログインし、パスキー登録後はパスキーのみでログインする
 - セッションは Cookie + Redis（30日スライディング）
-- WebAuthn challenge・レート制限・デバイス招待・パスワード再設定トークンも Redis
+- WebAuthn challenge・レート制限・デバイス招待・パスワード再設定・招待マジックリンクトークンも Redis
 - 永続ドメインデータ（User / Credential / Post）は PostgreSQL
 - デバイス追加・パスワード再設定・ユーザー招待はメール連携（`MAIL_MODE` で切替）
 
 ## 認証フロー
 
-1. 管理者がユーザーを招待すると、サーバーが仮パスワードを自動生成してメール通知し、同時に User を作成する（Credential なし）
+1. 管理者がユーザーを招待すると、サーバーが招待マジックリンクをメール通知し、同時に User を作成する（Credential なし。`User.password` は推測不能なハッシュ）
 2. seed 管理者は環境変数の初期パスワードで作成される
-3. **初回のみパスワードログイン** → Session 発行
+3. **初回はマジックリンク**（確認ボタンでトークン消費 → Session 発行）。seed 管理者のみパスワードログイン可
 4. ログイン後に **パスキー必須登録**（未設定中は setup / logout / me 以外不可）
-5. Credential が1件以上ある以降は **パスキーログインのみ**（パスワードログインは拒否）
+5. Credential が1件以上ある以降は **パスキーログインのみ**（パスワードログイン・マジックリンクは拒否）
 6. **復旧**: パスワード再設定メール → 新パスワード確定時に全パスキー削除＋全 Session 失効 → 自動ログイン → パスキー再登録必須
 
 ```text
-管理者招待 → 仮パスワードメール → パスワードログイン → パスキー必須登録 → 利用開始
+管理者招待 → マジックリンクメール → 確認ボタンでログイン → パスキー必須登録 → 利用開始
 日常: パスキーログイン（または有効 Session）→ Post / デバイス管理
-端末追加: 既存端末で再認証 → 招待メール → 新端末でパスキー登録
+端末追加: 既存端末で再認証 → 招待メール → 新端末でパスキー登録（ログインしない）
 復旧: forgot → メール → 新パスワード（警告）→ 自動ログイン → パスキー再登録
 ```
 
@@ -33,6 +33,7 @@ Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + Redis + React Islands による
 | 機能 | user | admin |
 |------|------|-------|
 | パスワード初回ログイン / パスキー設定 | ○ | ○ |
+| 招待マジックリンク（初回） | ○ | ○ |
 | パスキーログイン | ○ | ○ |
 | パスワード再設定（メール・パスキー全削除） | ○ | ○ |
 | 自分のデバイス管理 | ○ | ○ |
@@ -59,10 +60,11 @@ Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + Redis + React Islands による
 - Session: `sess:{tokenHash}`（値: id, userId, createdAt）+ `sess:user:{userId}` 索引
 - DeviceInvite: `invite:{tokenHash}` + `invite:user:{userId}` 索引（TTL 1h）
 - PasswordReset: `reset:{tokenHash}` + `reset:user:{userId}` 索引（TTL 1h）
+- MagicLink: `magic:{tokenHash}` + `magic:user:{userId}` 索引（TTL 1h、招待専用）
 - WebAuthn challenge / reauth-ok: `chal:*`（TTL 5分、消費型）
 - Rate limit: `rl:*`（固定ウィンドウ）
 
-Session / Invite / Reset のトークンは生値を Cookie・URL・メールにのみ載せ、Redis キーには SHA-256 ハッシュを用いる。使用済みはキー削除とし、`usedAt` / `revokedAt` は持たない。
+Session / Invite / Reset / Magic のトークンは生値を Cookie・URL・メールにのみ載せ、Redis キーには SHA-256 ハッシュを用いる。使用済みはキー削除とし、`usedAt` / `revokedAt` は持たない。
 
 ## セッション
 
@@ -73,7 +75,7 @@ Session / Invite / Reset のトークンは生値を Cookie・URL・メールに
 | 方式 | 永続 Cookie + Redis 検証、スライディング 30 日 |
 | Token | 通常アクセスでは変更しない（Cookie Max-Age と Redis TTL のみ更新） |
 | ログアウト | Cookie 削除 + 当該 Session キー削除（他デバイス非影響） |
-| 全失効 | `sess:user:{userId}` 経由で全キー削除（パスワード再設定時） |
+| 全失効 | `sess:user:{userId}` 経由で全キー削除（パスワード再設定時、招待マジックリンク再送時） |
 
 詳細は [session-management.md](./session-management.md)。
 
@@ -81,21 +83,23 @@ Session / Invite / Reset のトークンは生値を Cookie・URL・メールに
 
 - `MAIL_MODE=console`: 実送信せずログ出力（ローカル既定）
 - `MAIL_MODE=smtp`: nodemailer で実 SMTP 送信
-- 対象: ユーザー招待（仮パスワード）、デバイス招待、パスワード再設定
+- 対象: ユーザー招待（マジックリンク）、デバイス招待、パスワード再設定
 
 ## API 概要
 
 ### 認証 `/api/auth`
 
-- `POST /login/password` — Credential 0 件のみ
+- `POST /login/password` — Credential 0 件のみ（seed 管理者用）
 - `POST /login/passkey/options|verify`
 - `POST /passkey/register/options|verify` — 初回のみセッションから直接登録可
+- `POST /magic/consume` — 招待トークン消費（確認ボタン）。パスキー済みは拒否
+- `POST /magic/resend` — パスキー 0 件のときだけ再発行。発行時は既存 Session を全削除
 - `POST /password-reset/request|confirm`
 - `POST /logout` / `GET /me`
 
 ### 管理者 `/api/admin`
 
-- `GET /users` / `POST /users`（仮パスワード自動生成＋メール）
+- `GET /users` / `POST /users`（招待マジックリンク＋メール）
 - `GET /stats`
 
 ### デバイス `/api/devices`
@@ -126,15 +130,17 @@ Session / Invite / Reset のトークンは生値を Cookie・URL・メールに
 
 ## セキュリティ上の必須事項
 
-- DeviceInvite / PasswordReset は短命・単回使用（目安: デバイス招待 1h、再設定 1h）
-- ログイン・再設定リクエストに簡易レート制限（Redis 固定ウィンドウ）
+- DeviceInvite / PasswordReset / MagicLink は短命・単回使用（目安: 1h）
+- ログイン・再設定・マジックリンク発行に簡易レート制限（Redis 固定ウィンドウ）
 - パスキー未設定セッションは setup / logout / me 以外を拒否
-- 2台目以降のパスキーは再認証＋メール招待のみ
+- 2台目以降のパスキーは再認証＋メール招待のみ（クリックではログインしない）
 - パスワード再設定 UI で「全パスキー無効化」を警告表示
-- 再設定完了時は全 Credential 削除・全 Session 失効・未使用 DeviceInvite 無効化
+- 再設定完了時は全 Credential 削除・全 Session 失効・未使用 DeviceInvite / MagicLink 無効化
+- 招待マジックリンクの再送は、パスキー 0 件で新リンクを発行するときだけ既存 Session を全削除する
+- GET ではトークンを消費しない（確認ボタンの POST で消費）
 
 ## トレードオフ
 
-- メール受信箱の侵害はアカウント掌握につながる（メール側保護が前提）
+- メール受信箱の侵害は初回アカウント掌握につながる（メール側保護が前提）
 - パスワード再設定は1台紛失でも全パスキーをリセットする（安全側）
 - 招待・再設定リンクの可用性は Redis の永続化設定に依存する（Redis 再起動・データ消失で未使用トークンは無効になる）

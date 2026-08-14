@@ -41,7 +41,9 @@ export function createMemoryRedis() {
     async incr(key: string) {
       const current = alive(key)
       const next = String(Number(current?.value || '0') + 1)
-      store.set(key, { value: next, expiresAt: current?.expiresAt })
+      const entry: Entry = { value: next }
+      if (current?.expiresAt !== undefined) entry.expiresAt = current.expiresAt
+      store.set(key, entry)
       return Number(next)
     },
     async expire(key: string, seconds: number) {
@@ -74,7 +76,9 @@ export function createMemoryRedis() {
           added += 1
         }
       }
-      store.set(key, { value: [...set].join('\0'), expiresAt: entry?.expiresAt })
+      const next: Entry = { value: [...set].join('\0') }
+      if (entry?.expiresAt !== undefined) next.expiresAt = entry.expiresAt
+      store.set(key, next)
       return added
     },
     async srem(key: string, ...members: string[]) {
@@ -85,7 +89,9 @@ export function createMemoryRedis() {
       for (const member of members) {
         if (set.delete(member)) removed += 1
       }
-      store.set(key, { value: [...set].join('\0'), expiresAt: entry.expiresAt })
+      const next: Entry = { value: [...set].join('\0') }
+      if (entry.expiresAt !== undefined) next.expiresAt = entry.expiresAt
+      store.set(key, next)
       return removed
     },
     async smembers(key: string) {

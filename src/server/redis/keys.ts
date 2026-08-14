@@ -9,5 +9,7 @@ export const RedisKeys = {
   invite: (tokenHash: string) => redisKey(`invite:${tokenHash}`),
   inviteUser: (userId: string) => redisKey(`invite:user:${userId}`),
   reset: (tokenHash: string) => redisKey(`reset:${tokenHash}`),
-  resetUser: (userId: string) => redisKey(`reset:user:${userId}`)
+  resetUser: (userId: string) => redisKey(`reset:user:${userId}`),
+  magic: (tokenHash: string) => redisKey(`magic:${tokenHash}`),
+  magicUser: (userId: string) => redisKey(`magic:user:${userId}`)
 }

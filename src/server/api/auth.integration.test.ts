@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { redis } from '@/lib/redis'
 import app from '@/server/api/app'
 import { DEVICE_INVITE_TTL_MS } from '@/server/auth/env'
-import { sendPasswordResetMail } from '@/server/auth/mail'
+import { sendPasswordResetMail, sendUserInviteMail } from '@/server/auth/mail'
 import { verifyPassword } from '@/server/auth/password'
 import { createSession } from '@/server/auth/session'
 import { generateToken, hashToken } from '@/server/auth/tokens'
 import * as webauthn from '@/server/auth/webauthn'
 import CredentialDB from '@/server/db/credential'
 import InviteDB from '@/server/db/invite'
+import MagicLinkDB from '@/server/db/magic-link'
 import PasswordResetDB from '@/server/db/password-reset'
 import SessionDB from '@/server/db/session'
 import UserDB from '@/server/db/user'
@@ -136,7 +137,7 @@ describe('auth integration', () => {
     expect(await SessionDB.countForUser(user.id)).toBe(0)
   })
 
-  it('returns password method for users without passkeys', async () => {
+  it('returns magic method for users without passkeys', async () => {
     const { email } = await createTestUser()
 
     const res = await app.request('/auth/login/method', {
@@ -146,7 +147,7 @@ describe('auth integration', () => {
     })
 
     expect(res.status).toBe(200)
-    await expect(res.json()).resolves.toEqual({ method: 'password' })
+    await expect(res.json()).resolves.toEqual({ method: 'magic' })
   })
 
   it('returns passkey method and options for users with passkeys', async () => {
@@ -417,6 +418,27 @@ describe('auth integration', () => {
     expect(await InviteDB.findValidByTokenHash(hashToken(inviteToken))).toBeNull()
   })
 
+  it('invalidates pending magic links on password reset confirm', async () => {
+    const { email, user } = await createTestUser()
+    const magicToken = generateToken()
+    await MagicLinkDB.create(user.id, hashToken(magicToken), new Date(Date.now() + 60_000))
+
+    await app.request('/auth/password-reset/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    })
+    const resetToken = vi.mocked(sendPasswordResetMail).mock.calls[0]?.[0].token
+
+    await app.request('/auth/password-reset/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: resetToken, password: 'new-password-123' })
+    })
+
+    expect(await MagicLinkDB.findValidByTokenHash(hashToken(magicToken))).toBeNull()
+  })
+
   it('creates new session and redirects to setup-passkey', async () => {
     const { email, user } = await createTestUser()
 
@@ -664,5 +686,143 @@ describe('auth integration', () => {
       body: JSON.stringify({ token })
     })
     expect(res.status).toBe(400)
+  })
+
+  it('consumes an invite magic link once and creates a session', async () => {
+    const { user } = await createTestUser()
+    const token = generateToken()
+    await MagicLinkDB.create(user.id, hashToken(token), new Date(Date.now() + 60_000))
+
+    const res = await app.request('/auth/magic/consume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    })
+
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toEqual({ ok: true, redirectTo: '/setup-passkey' })
+    const sessionToken = sessionCookieFromResponse(res)
+    expect(sessionToken).toBeTruthy()
+    expect(await SessionDB.findValidByTokenHash(hashToken(sessionToken!))).toMatchObject({
+      userId: user.id
+    })
+    expect(await MagicLinkDB.findValidByTokenHash(hashToken(token))).toBeNull()
+
+    const second = await app.request('/auth/magic/consume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    })
+    expect(second.status).toBe(400)
+  })
+
+  it('rejects magic link consume when the user already has a passkey', async () => {
+    const { user } = await createTestUser()
+    await insertPasskeyFixture(user.id)
+    const token = generateToken()
+    await MagicLinkDB.create(user.id, hashToken(token), new Date(Date.now() + 60_000))
+
+    const res = await app.request('/auth/magic/consume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    })
+
+    expect(res.status).toBe(400)
+    expect(await SessionDB.countForUser(user.id)).toBe(0)
+  })
+
+  it('resends a magic link for users without passkeys and revokes existing sessions', async () => {
+    const { email, user } = await createTestUser()
+    const { token: oldSession } = await createSession(user.id)
+
+    const res = await app.request('/auth/magic/resend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    })
+
+    expect(res.status).toBe(200)
+    expect(sendUserInviteMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: user.email,
+        name: user.name,
+        token: expect.any(String)
+      })
+    )
+    expect(await SessionDB.findValidByTokenHash(hashToken(oldSession))).toBeNull()
+    expect(await MagicLinkDB.countForUser(user.id)).toBe(1)
+  })
+
+  it('does not send a magic link for unknown emails or users with passkeys', async () => {
+    const { email, user } = await createTestUser()
+    await insertPasskeyFixture(user.id)
+
+    const unknown = await app.request('/auth/magic/resend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'missing@example.com' })
+    })
+    const withPasskey = await app.request('/auth/magic/resend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    })
+
+    expect(unknown.status).toBe(200)
+    expect(withPasskey.status).toBe(200)
+    expect(sendUserInviteMail).not.toHaveBeenCalled()
+    expect(await SessionDB.countForUser(user.id)).toBe(0)
+  })
+
+  it('rejects invalid or expired magic link tokens without creating a session', async () => {
+    const { user } = await createTestUser()
+    const expiredToken = generateToken()
+    await MagicLinkDB.create(user.id, hashToken(expiredToken), new Date(Date.now() + 60_000))
+    await redis.del(RedisKeys.magic(hashToken(expiredToken)))
+
+    const missing = await app.request('/auth/magic/consume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'not-a-real-token' })
+    })
+    const expired = await app.request('/auth/magic/consume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: expiredToken })
+    })
+
+    expect(missing.status).toBe(400)
+    expect(expired.status).toBe(400)
+    expect(await SessionDB.countForUser(user.id)).toBe(0)
+  })
+
+  it('stops sending magic link mail after exceeding resend attempts', async () => {
+    const { email } = await createTestUser()
+
+    for (let i = 0; i < 5; i++) {
+      const res = await app.request('/auth/magic/resend', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-forwarded-for': '203.0.113.30'
+        },
+        body: JSON.stringify({ email })
+      })
+      expect(res.status).toBe(200)
+    }
+    expect(sendUserInviteMail).toHaveBeenCalledTimes(5)
+
+    const limited = await app.request('/auth/magic/resend', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-forwarded-for': '203.0.113.30'
+      },
+      body: JSON.stringify({ email })
+    })
+
+    expect(limited.status).toBe(200)
+    expect(sendUserInviteMail).toHaveBeenCalledTimes(5)
   })
 })

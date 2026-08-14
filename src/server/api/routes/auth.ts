@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server'
 import { PASSWORD_RESET_TTL_MS } from '@/server/auth/env'
+import { issueInviteMagicLink } from '@/server/auth/magic-link'
 import { sendPasswordResetMail } from '@/server/auth/mail'
 import { hashPassword, verifyPassword } from '@/server/auth/password'
 import { checkRateLimit } from '@/server/auth/rate-limit'
@@ -17,7 +18,7 @@ import {
   verifyAuthentication,
   verifyRegistration
 } from '@/server/auth/webauthn'
-import { CredentialDB, InviteDB, PasswordResetDB, SessionDB, UserDB } from '@/server/db'
+import { CredentialDB, InviteDB, MagicLinkDB, PasswordResetDB, SessionDB, UserDB } from '@/server/db'
 import { loadSession, requireAuth } from '@/server/middleware/auth'
 import type { AppVariables } from '@/server/middleware/types'
 
@@ -110,7 +111,7 @@ auth.post('/login/method', async (c) => {
       return c.json({ method: 'passkey', options: result.options }, 200)
     }
 
-    return c.json({ method: 'password' }, 200)
+    return c.json({ method: 'magic' }, 200)
   } catch (error) {
     console.error('ログイン方式判定エラー:', error)
     return c.json({ error: 'ログインに失敗しました' }, 500)
@@ -271,6 +272,7 @@ auth.post('/password-reset/confirm', async (c) => {
     await SessionDB.revokeAllForUser(reset.userId)
     await InviteDB.invalidatePendingForUser(reset.userId)
     await PasswordResetDB.invalidatePendingForUser(reset.userId)
+    await MagicLinkDB.invalidatePendingForUser(reset.userId)
 
     const { token: sessionToken } = await createSession(reset.userId)
     setSessionCookieOnContext(c, sessionToken)
@@ -279,6 +281,82 @@ auth.post('/password-reset/confirm', async (c) => {
   } catch (error) {
     console.error('パスワード再設定確定エラー:', error)
     return c.json({ error: 'パスワード再設定に失敗しました' }, 500)
+  }
+})
+
+auth.post('/magic/consume', async (c) => {
+  try {
+    const body = await c.req.json()
+    const token = String(body.token || '')
+    const ip = c.req.header('x-forwarded-for') || 'local'
+    const limited = await checkRateLimit(`magic:${ip}`, 10, 15 * 60 * 1000)
+    if (!limited.ok) {
+      return c.json({ error: '試行回数が多すぎます。しばらくしてから再試行してください' }, 429)
+    }
+
+    if (!token) {
+      return c.json({ error: 'トークンが必要です' }, 400)
+    }
+
+    const tokenHash = hashToken(token)
+    const pending = await MagicLinkDB.findValidByTokenHash(tokenHash)
+    if (!pending) {
+      return c.json({ error: 'ログイン用リンクが無効または期限切れです' }, 400)
+    }
+
+    const credentialCount = await UserDB.countCredentials(pending.userId)
+    if (credentialCount > 0) {
+      return c.json({ error: 'このリンクは使えません' }, 400)
+    }
+
+    const record = await MagicLinkDB.consume(tokenHash)
+    if (!record) {
+      return c.json({ error: 'ログイン用リンクが無効または期限切れです' }, 400)
+    }
+
+    const { token: sessionToken } = await createSession(record.userId)
+    setSessionCookieOnContext(c, sessionToken)
+
+    return c.json({ ok: true, redirectTo: '/setup-passkey' }, 200)
+  } catch (error) {
+    console.error('マジックリンク消費エラー:', error)
+    return c.json({ error: 'ログインに失敗しました' }, 500)
+  }
+})
+
+auth.post('/magic/resend', async (c) => {
+  const generic = {
+    message:
+      '入力されたメールアドレスにアカウントがあり、パスキー未設定の場合、ログイン用リンクを送信しました'
+  }
+
+  try {
+    const body = await c.req.json()
+    const email = String(body.email || '').trim().toLowerCase()
+    const ip = c.req.header('x-forwarded-for') || 'local'
+    const limited = await checkRateLimit(`magic-resend:${ip}:${email}`, 5, 15 * 60 * 1000)
+    if (!limited.ok) {
+      return c.json(generic, 200)
+    }
+
+    if (!email) {
+      return c.json(generic, 200)
+    }
+
+    const user = await UserDB.findByEmail(email)
+    if (user && (await UserDB.countCredentials(user.id)) === 0) {
+      await issueInviteMagicLink({
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        revokeSessions: true
+      })
+    }
+
+    return c.json(generic, 200)
+  } catch (error) {
+    console.error('マジックリンク再送エラー:', error)
+    return c.json(generic, 200)
   }
 })
 

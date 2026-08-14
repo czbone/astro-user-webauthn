@@ -59,7 +59,7 @@ describe('admin integration', () => {
     })
   })
 
-  it('creates a new user with temporary password and sends email', async () => {
+  it('creates a new user and sends a magic link email', async () => {
     const { cookie } = await adminCookie()
 
     const res = await app.request('/admin/users', {
@@ -85,7 +85,7 @@ describe('admin integration', () => {
       expect.objectContaining({
         to: 'invitee@example.com',
         name: 'Invitee',
-        temporaryPassword: expect.any(String)
+        token: expect.any(String)
       })
     )
   })
@@ -184,7 +184,7 @@ describe('admin integration', () => {
       to: 'mail-check@example.com',
       name: 'Mail Check'
     })
-    expect(arg?.temporaryPassword.length).toBeGreaterThanOrEqual(8)
+    expect(arg?.token.length).toBeGreaterThan(10)
   })
 
   it('returns correct counts for users, admins, posts, and published posts', async () => {

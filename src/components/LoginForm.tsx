@@ -5,9 +5,10 @@ import AuthFetch from '@/api-client/auth'
 export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [step, setStep] = useState<'email' | 'password' | 'passkey'>('email')
+  const [step, setStep] = useState<'email' | 'magic' | 'passkey'>('email')
   const [passkeyOptions, setPasskeyOptions] = useState<unknown>(null)
   const [loading, setLoading] = useState(false)
+  const [resendMessage, setResendMessage] = useState('')
 
   async function handleContinue(e: React.FormEvent) {
     e.preventDefault()
@@ -25,7 +26,8 @@ export default function LoginForm() {
         return
       }
 
-      setStep('password')
+      setResendMessage('')
+      setStep('magic')
     } finally {
       setLoading(false)
     }
@@ -41,6 +43,19 @@ export default function LoginForm() {
         return
       }
       window.location.href = '/setup-passkey'
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleResend() {
+    setLoading(true)
+    try {
+      const result = await AuthFetch.magicResend(email)
+      setResendMessage(
+        result?.data?.message ||
+          '入力されたメールアドレスにアカウントがあり、パスキー未設定の場合、ログイン用リンクを送信しました'
+      )
     } finally {
       setLoading(false)
     }
@@ -94,26 +109,44 @@ export default function LoginForm() {
         </form>
       )}
 
-      {step === 'password' && (
-        <form onSubmit={handlePasswordLogin} className="space-y-4">
+      {step === 'magic' && (
+        <div className="space-y-4">
           <p className="text-sm text-gray-600">{email}</p>
-          <div>
-            <label className="mb-1 block text-sm text-gray-700">パスワード</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded border border-gray-300 px-3 py-2"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded bg-gray-800 px-4 py-2 text-white hover:bg-gray-700 disabled:opacity-50"
-          >
-            パスワードでログイン
-          </button>
+          <p className="text-sm text-gray-700">
+            招待メールのリンクを開いてログインしてください。届いていない場合は再送できます。
+          </p>
+          {resendMessage ? (
+            <p className="text-sm text-gray-800">{resendMessage}</p>
+          ) : (
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void handleResend()}
+              className="w-full rounded bg-gray-800 px-4 py-2 text-white hover:bg-gray-700 disabled:opacity-50"
+            >
+              ログイン用リンクを再送
+            </button>
+          )}
+          <form onSubmit={handlePasswordLogin} className="space-y-4 border-t border-gray-200 pt-4">
+            <p className="text-sm text-gray-600">初期管理者など、パスワードをお持ちの場合</p>
+            <div>
+              <label className="mb-1 block text-sm text-gray-700">パスワード</label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded bg-gray-800 px-4 py-2 text-white hover:bg-gray-700 disabled:opacity-50"
+            >
+              パスワードでログイン
+            </button>
+          </form>
           <button
             type="button"
             onClick={() => setStep('email')}
@@ -121,7 +154,7 @@ export default function LoginForm() {
           >
             戻る
           </button>
-        </form>
+        </div>
       )}
 
       {step === 'passkey' && (
@@ -131,7 +164,7 @@ export default function LoginForm() {
           <button
             type="button"
             disabled={loading}
-            onClick={handlePasskeyLogin}
+            onClick={() => void handlePasskeyLogin()}
             className="w-full rounded bg-gray-800 px-4 py-2 text-white hover:bg-gray-700 disabled:opacity-50"
           >
             パスキーでログイン

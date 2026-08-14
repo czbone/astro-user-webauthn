@@ -68,6 +68,11 @@ vi.mock('@/server/db', () => ({
   PasswordResetDB: {
     invalidatePendingForUser: vi.fn(),
     create: vi.fn()
+  },
+  MagicLinkDB: {
+    invalidatePendingForUser: vi.fn(),
+    create: vi.fn(),
+    consume: vi.fn()
   }
 }))
 

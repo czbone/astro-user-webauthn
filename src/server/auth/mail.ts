@@ -49,20 +49,18 @@ export async function sendMail(message: MailMessage): Promise<void> {
 export async function sendUserInviteMail(params: {
   to: string
   name: string
-  temporaryPassword: string
+  token: string
 }) {
-  const loginUrl = `${authEnv.appUrl()}/login`
+  const url = `${authEnv.appUrl()}/auth/link/${params.token}`
   const text = [
     `${params.name} 様`,
     '',
-    'アカウントが作成されました。以下の情報で初回ログインしてください。',
+    'アカウントが作成されました。以下のリンクからログインしてください（1時間有効）。',
     '',
-    `ログインURL: ${loginUrl}`,
-    `メールアドレス: ${params.to}`,
-    `仮パスワード: ${params.temporaryPassword}`,
+    url,
     '',
-    'ログイン後、パスキー（WebAuthn）の登録が必要です。',
-    'パスキー登録後は仮パスワードではログインできなくなります。'
+    'リンクを開いたあと、画面のボタンでログインを確定してください。',
+    'ログイン後、パスキー（WebAuthn）の登録が必要です。'
   ].join('\n')
 
   await sendMail({
