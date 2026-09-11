@@ -65,6 +65,9 @@ COPY --from=build --chown=nodejs:nodejs /app/src/generated ./src/generated
 COPY --chown=nodejs:nodejs prisma ./prisma
 COPY --chown=nodejs:nodejs prisma.config.ts ./
 
+# シードランナー（pnpm db:seed → dist/seed.mjs）
+COPY --chown=nodejs:nodejs scripts/run-seed.mjs ./scripts/run-seed.mjs
+
 # 起動スクリプトをコピー
 COPY --chown=nodejs:nodejs entrypoint.sh healthcheck.sh ./
 RUN chmod +x entrypoint.sh healthcheck.sh
