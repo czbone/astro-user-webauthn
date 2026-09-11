@@ -72,6 +72,8 @@ pnpm dev
 
 `http://localhost:3000` で起動します。seed 管理者でパスワードログインし、パスキーを登録してください。
 
+`pnpm db:seed` は **User が 0 件のときだけ** 管理者を作成します。既にユーザーがある場合は何もしません。全消ししてやり直すときは `pnpm db:reset` を使います。
+
 ローカルでは `MAIL_MODE=console` のため、招待・再設定メールはサーバーログに出力されます。
 
 ## 主な画面
@@ -135,6 +137,22 @@ pnpm build
 ### 手動検証
 
 セットアップ後に `pnpm dev` で起動し、seed 管理者でログインしてパスキーを登録したうえで、主要フロー（招待・デバイス追加・再設定・投稿など）をブラウザで確認します。`MAIL_MODE=console` のときは招待・再設定リンクがサーバーログに出ます。
+
+## 本番（Coolify）の初期管理者
+
+初回デプロイで管理者を入れる場合:
+
+```env
+RUN_SEED="true"
+SEED_ADMIN_EMAIL="admin@example.com"
+SEED_ADMIN_PASSWORD="既定値以外の強いパスワード"
+NODE_ENV="production"
+```
+
+- `pnpm db:seed`（コンテナ内では `node dist/seed.mjs`）は User が空のときだけ作成する
+- 作成後も `RUN_SEED=true` のままで再デプロイしてよい（スキップされる）。外してもよい
+- `NODE_ENV=production` では `SEED_ADMIN_PASSWORD` 未設定、または既定値 `admin-change-me` だとシードは失敗し、コンテナは起動しない
+- 手動実行: アプリコンテナで `pnpm db:seed`
 
 ## 本番メール
 

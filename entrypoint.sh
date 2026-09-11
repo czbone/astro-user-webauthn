@@ -47,16 +47,15 @@ else
     exit 1
 fi
 
-# オプション：初回デプロイ時のシード実行
+# オプション：初回デプロイ時のシード実行（User が空のときだけ管理者を作成）
 # 環境変数 RUN_SEED=true を設定すると実行される
 if [ "$RUN_SEED" = "true" ]; then
     echo "🌱 Running seed..."
-    pnpm run db:seed > /dev/null 2>&1
-    
-    if [ $? -eq 0 ]; then
+    if pnpm run db:seed; then
         echo "✅ Seed completed"
     else
-        echo "⚠️  Seed failed (continuing)"
+        echo "❌ Seed failed"
+        exit 1
     fi
 fi
 
