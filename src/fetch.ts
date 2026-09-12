@@ -2,6 +2,9 @@ import { Hono } from 'hono'
 import { App } from 'astro/app'
 import { middleware, pages } from 'astro/hono'
 import api from '@/server/api/app'
+import { validateRuntimeEnv } from '@/server/env-check'
+
+validateRuntimeEnv()
 
 const app = new Hono()
 

@@ -9,6 +9,14 @@ if [ -z "$DATABASE_URL" ]; then
     exit 1
 fi
 
+echo "🔎 Checking environment variables..."
+if node dist/env-check.mjs; then
+    echo "✅ Environment OK"
+else
+    echo "❌ Environment check failed"
+    exit 1
+fi
+
 # データベース接続の待機（オプション：PostgreSQLが起動するまで待つ）
 echo "⏳ Waiting for database connection..."
 max_attempts=30

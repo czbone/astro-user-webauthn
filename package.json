@@ -5,7 +5,7 @@
   "version": "0.0.1",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build && pnpm run db:seed:build",
+    "build": "astro build && pnpm run db:seed:build && pnpm run env:check:build",
     "preview": "astro preview",
     "start": "node ./dist/server/entry.mjs",
     "format": "prettier -w .",
@@ -19,7 +19,8 @@
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
     "db:seed": "node ./scripts/run-seed.mjs",
-    "db:seed:build": "esbuild prisma/seed.ts --bundle --platform=node --format=esm --packages=external --alias:@=./src --outfile=dist/seed.mjs"
+    "db:seed:build": "esbuild prisma/seed.ts --bundle --platform=node --format=esm --packages=external --alias:@=./src --outfile=dist/seed.mjs",
+    "env:check:build": "esbuild src/server/env-check.ts --bundle --platform=node --format=esm --outfile=dist/env-check.mjs"
   },
   "dependencies": {
     "@astrojs/node": "^11.1.5",

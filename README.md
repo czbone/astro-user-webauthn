@@ -143,12 +143,18 @@ pnpm build
 初回デプロイで管理者を入れる場合:
 
 ```env
+NODE_ENV="production"
+DATABASE_URL="postgresql://..."
+REDIS_URL="redis://..."
+APP_URL="https://app.example.com"
+WEBAUTHN_RP_ID="app.example.com"
+WEBAUTHN_ORIGIN="https://app.example.com"
 RUN_SEED="true"
 SEED_ADMIN_EMAIL="admin@example.com"
 SEED_ADMIN_PASSWORD="既定値以外の強いパスワード"
-NODE_ENV="production"
 ```
 
+- `NODE_ENV=production` のとき、上記の必須変数が未設定、または `localhost` のままだと起動時チェックでコンテナが止まる
 - `pnpm db:seed`（コンテナ内では `node dist/seed.mjs`）は User が空のときだけ作成する
 - 作成後も `RUN_SEED=true` のままで再デプロイしてよい（スキップされる）。外してもよい
 - `NODE_ENV=production` では `SEED_ADMIN_PASSWORD` 未設定、または既定値 `admin-change-me` だとシードは失敗し、コンテナは起動しない
