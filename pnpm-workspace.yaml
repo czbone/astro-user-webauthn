@@ -25,3 +25,4 @@ minimumReleaseAgeExclude:
   - astro@6.4.3 || 7.2.0
   - pg-protocol@1.16.0
   - pg@8.23.0
+  - nodemailer@10.0.8
