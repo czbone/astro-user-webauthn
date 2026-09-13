@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
+import { isDbLogLevel } from '@/server/db-log'
 
 export type EnvIssue = {
   level: 'error' | 'warn'
@@ -72,6 +73,15 @@ export function collectEnvIssues(
         message: 'MAIL_MODE=smtp のときは SMTP_HOST と SMTP_FROM が必要です'
       })
     }
+  }
+
+  const dbLogLevel = env.DB_LOG_LEVEL?.trim()
+  if (dbLogLevel && !isDbLogLevel(dbLogLevel)) {
+    issues.push({
+      level: production ? 'error' : 'warn',
+      name: 'DB_LOG_LEVEL',
+      message: `DB_LOG_LEVEL の値が不正です: ${dbLogLevel}（silent / error / warn / info / query）`
+    })
   }
 
   if (env.RUN_SEED === 'true' && production) {

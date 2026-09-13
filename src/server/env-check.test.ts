@@ -57,6 +57,17 @@ describe('collectEnvIssues', () => {
     expect(issues.some((issue) => issue.name === 'SMTP' && issue.level === 'error')).toBe(true)
   })
 
+  it('errors on an invalid DB_LOG_LEVEL in production', () => {
+    const issues = collectEnvIssues({ ...productionBase, DB_LOG_LEVEL: 'debug' }, true)
+    expect(issues.some((issue) => issue.name === 'DB_LOG_LEVEL' && issue.level === 'error')).toBe(
+      true
+    )
+  })
+
+  it('accepts a valid DB_LOG_LEVEL in production', () => {
+    expect(collectEnvIssues({ ...productionBase, DB_LOG_LEVEL: 'query' }, true)).toEqual([])
+  })
+
   it('errors when production seed uses the default password', () => {
     const issues = collectEnvIssues(
       { ...productionBase, RUN_SEED: 'true', SEED_ADMIN_PASSWORD: 'admin-change-me' },

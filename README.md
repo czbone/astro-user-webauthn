@@ -39,6 +39,7 @@ pnpm install
 
 ```env
 DATABASE_URL="postgresql://username:password@localhost:5432/database_name?schema=public"
+# DB_LOG_LEVEL="query"
 REDIS_URL="redis://localhost:6379/"
 APP_URL="http://localhost:3000"
 WEBAUTHN_RP_ID="localhost"
@@ -155,6 +156,7 @@ SEED_ADMIN_PASSWORD="既定値以外の強いパスワード"
 
 - 本番イメージは `NODE_ENV=production` 固定。必須変数が未設定、または `localhost` のままだと起動時チェックでコンテナが止まる
 - HTTPS 必須（セッション Cookie に `Secure` が付く）
+- `DB_LOG_LEVEL`（`silent` / `error` / `warn` / `info` / `query`）で Prisma ログを切り替え。未設定は本番 `warn`。変更後は再起動が必要
 - `pnpm db:seed`（コンテナ内では `node dist/seed.mjs`）は User が空のときだけ作成する
 - 作成後も `RUN_SEED=true` のままで再デプロイしてよい（スキップされる）。外してもよい
 - `NODE_ENV=production` では `SEED_ADMIN_PASSWORD` 未設定、または既定値 `admin-change-me` だとシードは失敗し、コンテナは起動しない
