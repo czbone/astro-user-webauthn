@@ -31,6 +31,70 @@ function isDevelopmentDefault(name: string, value: string): boolean {
   return defaults.includes(value) || defaults.includes(value.replace(/\/$/, ''))
 }
 
+function parseHttpUrl(value: string): URL | null {
+  try {
+    return new URL(value)
+  } catch {
+    return null
+  }
+}
+
+const WEBAUTHN_ORIGIN_VARS = ['APP_URL', 'WEBAUTHN_ORIGIN', 'WEBAUTHN_RP_ID'] as const
+
+function collectWebAuthnOriginIssues(
+  appUrl: string,
+  webauthnOrigin: string,
+  rpId: string
+): EnvIssue[] {
+  const issues: EnvIssue[] = []
+  const app = parseHttpUrl(appUrl)
+  const origin = parseHttpUrl(webauthnOrigin)
+
+  if (!app) {
+    issues.push({
+      level: 'error',
+      name: 'APP_URL',
+      message: `APP_URL が URL として解釈できません: ${appUrl}`
+    })
+  }
+  if (!origin) {
+    issues.push({
+      level: 'error',
+      name: 'WEBAUTHN_ORIGIN',
+      message: `WEBAUTHN_ORIGIN が URL として解釈できません: ${webauthnOrigin}`
+    })
+  }
+  if (!app || !origin) {
+    return issues
+  }
+
+  if (app.origin !== origin.origin) {
+    issues.push({
+      level: 'error',
+      name: 'WEBAUTHN_ORIGIN',
+      message: `WEBAUTHN_ORIGIN (${origin.origin}) と APP_URL (${app.origin}) の origin が一致しません`
+    })
+  }
+
+  if (rpId !== origin.hostname) {
+    issues.push({
+      level: 'error',
+      name: 'WEBAUTHN_RP_ID',
+      message: `WEBAUTHN_RP_ID (${rpId}) が WEBAUTHN_ORIGIN のホスト (${origin.hostname}) と一致しません`
+    })
+  }
+
+  if (origin.protocol !== 'https:') {
+    issues.push({
+      level: 'error',
+      name: 'WEBAUTHN_ORIGIN',
+      message: `本番の WEBAUTHN_ORIGIN は https である必要があります: ${webauthnOrigin}`
+    })
+  }
+
+  return issues
+}
+
 export function collectEnvIssues(
   env: Record<string, string | undefined>,
   production: boolean
@@ -62,6 +126,31 @@ export function collectEnvIssues(
         name,
         message: `${name} が開発用の値（${value}）のままです`
       })
+    }
+  }
+
+  if (production) {
+    const blocked = new Set(
+      issues
+        .filter(
+          (issue) =>
+            issue.level === 'error' &&
+            (WEBAUTHN_ORIGIN_VARS as readonly string[]).includes(issue.name)
+        )
+        .map((issue) => issue.name)
+    )
+    const appUrl = env.APP_URL?.trim()
+    const webauthnOrigin = env.WEBAUTHN_ORIGIN?.trim()
+    const rpId = env.WEBAUTHN_RP_ID?.trim()
+    if (
+      appUrl &&
+      webauthnOrigin &&
+      rpId &&
+      !blocked.has('APP_URL') &&
+      !blocked.has('WEBAUTHN_ORIGIN') &&
+      !blocked.has('WEBAUTHN_RP_ID')
+    ) {
+      issues.push(...collectWebAuthnOriginIssues(appUrl, webauthnOrigin, rpId))
     }
   }
 

@@ -77,4 +77,75 @@ describe('collectEnvIssues', () => {
       issues.some((issue) => issue.name === 'SEED_ADMIN_PASSWORD' && issue.level === 'error')
     ).toBe(true)
   })
+
+  it('accepts a trailing slash on APP_URL in production', () => {
+    expect(
+      collectEnvIssues({ ...productionBase, APP_URL: 'https://app.example.com/' }, true)
+    ).toEqual([])
+  })
+
+  it('errors when APP_URL and WEBAUTHN_ORIGIN differ in production', () => {
+    const issues = collectEnvIssues(
+      {
+        ...productionBase,
+        APP_URL: 'https://sample1.keyaki.cc',
+        WEBAUTHN_ORIGIN: 'https://sample.keyaki.cc',
+        WEBAUTHN_RP_ID: 'sample.keyaki.cc'
+      },
+      true
+    )
+    expect(
+      issues.some(
+        (issue) =>
+          issue.name === 'WEBAUTHN_ORIGIN' &&
+          issue.level === 'error' &&
+          issue.message.includes('origin が一致しません')
+      )
+    ).toBe(true)
+  })
+
+  it('errors when WEBAUTHN_RP_ID does not match the origin hostname in production', () => {
+    const issues = collectEnvIssues(
+      {
+        ...productionBase,
+        WEBAUTHN_RP_ID: 'sample.keyaki.cc'
+      },
+      true
+    )
+    expect(
+      issues.some((issue) => issue.name === 'WEBAUTHN_RP_ID' && issue.level === 'error')
+    ).toBe(true)
+  })
+
+  it('errors when WEBAUTHN_ORIGIN is http in production', () => {
+    const issues = collectEnvIssues(
+      {
+        ...productionBase,
+        APP_URL: 'http://app.example.com',
+        WEBAUTHN_ORIGIN: 'http://app.example.com'
+      },
+      true
+    )
+    expect(
+      issues.some(
+        (issue) =>
+          issue.name === 'WEBAUTHN_ORIGIN' &&
+          issue.level === 'error' &&
+          issue.message.includes('https')
+      )
+    ).toBe(true)
+  })
+
+  it('does not check origin consistency outside production', () => {
+    const issues = collectEnvIssues(
+      {
+        APP_URL: 'https://sample1.keyaki.cc',
+        WEBAUTHN_ORIGIN: 'https://sample.keyaki.cc',
+        WEBAUTHN_RP_ID: 'sample.keyaki.cc'
+      },
+      false
+    )
+    expect(issues.filter((issue) => issue.level === 'error')).toEqual([])
+    expect(issues.some((issue) => issue.message.includes('origin が一致しません'))).toBe(false)
+  })
 })
