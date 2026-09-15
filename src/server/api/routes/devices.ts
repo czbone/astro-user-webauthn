@@ -104,7 +104,7 @@ devices.delete('/:id', requireAuth, requirePasskey, async (c) => {
     const count = await CredentialDB.countForUser(user.id)
     if (count <= 1) {
       return c.json(
-        { error: '最後のパスキーは削除できません。復旧はパスワード再設定を利用してください。' },
+        { error: '最後のパスキーは削除できません。ログインできないときの復旧を利用してください。' },
         400
       )
     }

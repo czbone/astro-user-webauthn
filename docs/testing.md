@@ -96,6 +96,6 @@ WebAuthn はブラウザのパスキー UI が必要です（`localhost` + `WEBA
 | 以降のパスキーログイン | `/login` |
 | 管理者によるユーザー招待 | `/admin/users`（ログの招待リンク） |
 | デバイス追加 | `/devices` → `/invite/device/[token]` |
-| パスワード再設定 | `/forgot-password` → `/reset-password/[token]` |
+| ログインできないときの復旧 | `/forgot-password` → `/reset-password/[token]` |
 | 投稿の閲覧・作成 | `/posts` |
 | 管理者ダッシュボード | `/dashboard` |

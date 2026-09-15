@@ -102,7 +102,7 @@ export async function sendPasswordResetMail(params: {
   const text = [
     `${params.name} 様`,
     '',
-    'パスワード再設定用のリンクです（1時間有効）。',
+    'ログインできないときの復旧用リンクです（1時間有効）。',
     '',
     url,
     '',
@@ -112,7 +112,7 @@ export async function sendPasswordResetMail(params: {
 
   await sendMail({
     to: params.to,
-    subject: 'パスワード再設定のご案内',
+    subject: 'ログインできないときの復旧',
     text
   })
 }

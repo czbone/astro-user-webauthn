@@ -22,9 +22,9 @@ export default function ForgotPasswordForm() {
 
   return (
     <div className="mx-auto max-w-md rounded-lg bg-white p-6 shadow">
-      <h2 className="mb-4 text-xl font-semibold text-gray-900">パスワード再設定</h2>
+      <h2 className="mb-4 text-xl font-semibold text-gray-900">ログインできないとき</h2>
       <p className="mb-4 text-sm text-gray-600">
-        再設定を完了すると、登録済みのパスキーはすべて無効になります。
+        パスキーでログインできない場合の復旧です。完了すると、登録済みのパスキーはすべて無効になります。
       </p>
       {message ? (
         <p className="text-sm text-gray-800">{message}</p>
@@ -45,7 +45,7 @@ export default function ForgotPasswordForm() {
             disabled={loading}
             className="w-full rounded bg-gray-800 px-4 py-2 text-white hover:bg-gray-700 disabled:opacity-50"
           >
-            再設定メールを送信
+            復旧メールを送信
           </button>
         </form>
       )}

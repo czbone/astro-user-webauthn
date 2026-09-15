@@ -181,7 +181,7 @@ export default function LoginForm() {
 
       <p className="mt-6 text-center text-sm">
         <a href="/forgot-password" className="text-gray-700 underline">
-          パスワードを忘れた場合
+          ログインできないとき
         </a>
       </p>
     </div>

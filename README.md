@@ -10,7 +10,7 @@ Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + Redis による、管理者招�
 - 初回マジックリンクログイン → パスキー必須登録 → 以降パスキーログイン
 - セッション（Cookie + Redis、30日スライディング）
 - デバイス追加（再認証＋メール招待）
-- パスワード再設定（全パスキー削除＋全 Session 失効）
+- ログインできないときの復旧（パスワード再設定。全パスキー削除＋全 Session 失効）
 - 投稿（公開は全員閲覧、書き込みは本人のみ）
 - 管理者ダッシュボード / ユーザー管理
 
@@ -88,7 +88,7 @@ pnpm dev
 | `/devices` | デバイス管理 |
 | `/dashboard` | 管理者ダッシュボード |
 | `/admin/users` | ユーザー招待・一覧 |
-| `/forgot-password` / `/reset-password/[token]` | パスワード再設定 |
+| `/forgot-password` / `/reset-password/[token]` | ログインできないときの復旧 |
 | `/invite/device/[token]` | デバイス用パスキー登録 |
 
 ## API
