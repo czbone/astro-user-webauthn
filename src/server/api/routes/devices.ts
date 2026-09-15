@@ -47,7 +47,6 @@ devices.post('/register/verify', async (c) => {
     const body = await c.req.json()
     const token = String(body.token || '')
     const response = body.response as RegistrationResponseJSON
-    const deviceName = body.deviceName ? String(body.deviceName) : undefined
 
     if (!token || !response) {
       return c.json({ error: '招待トークンと登録レスポンスが必要です' }, 400)
@@ -57,6 +56,14 @@ devices.post('/register/verify', async (c) => {
     const invite = await InviteDB.findValidByTokenHash(tokenHash)
     if (!invite) {
       return c.json({ error: '招待が無効または期限切れです' }, 400)
+    }
+
+    const deviceName = CredentialDB.normalizeDeviceName(body.deviceName)
+    if (!deviceName) {
+      return c.json({ error: 'デバイス名は必須です' }, 400)
+    }
+    if (await CredentialDB.existsByUserIdAndDeviceName(invite.userId, deviceName)) {
+      return c.json({ error: '同じデバイス名は既に登録されています' }, 400)
     }
 
     await verifyRegistration(invite.userId, response, deviceName)

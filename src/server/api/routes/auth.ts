@@ -196,9 +196,16 @@ auth.post('/passkey/register/verify', requireAuth, async (c) => {
 
     const body = await c.req.json()
     const response = body.response as RegistrationResponseJSON
-    const deviceName = body.deviceName ? String(body.deviceName) : undefined
     if (!response) {
       return c.json({ error: '登録レスポンスが必要です' }, 400)
+    }
+
+    const deviceName = CredentialDB.normalizeDeviceName(body.deviceName)
+    if (!deviceName) {
+      return c.json({ error: 'デバイス名は必須です' }, 400)
+    }
+    if (await CredentialDB.existsByUserIdAndDeviceName(user.id, deviceName)) {
+      return c.json({ error: '同じデバイス名は既に登録されています' }, 400)
     }
 
     await verifyRegistration(user.id, response, deviceName)

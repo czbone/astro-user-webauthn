@@ -296,6 +296,65 @@ describe('devices integration', () => {
     expect(await InviteDB.findValidByTokenHash(tokenHash)).toBeNull()
   })
 
+  it('rejects device registration without a device name', async () => {
+    const { user } = await createTestUser()
+    await insertPasskeyFixture(user.id)
+    const token = generateToken()
+    const tokenHash = hashToken(token)
+    await InviteDB.create(user.id, tokenHash, new Date(Date.now() + DEVICE_INVITE_TTL_MS))
+    const spy = vi.spyOn(webauthn, 'verifyRegistration')
+
+    const res = await app.request('/devices/register/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        response: {
+          id: 'fake',
+          rawId: 'fake',
+          response: {},
+          type: 'public-key',
+          clientExtensionResults: {}
+        }
+      })
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({ error: 'デバイス名は必須です' })
+    expect(spy).not.toHaveBeenCalled()
+    expect(await InviteDB.findValidByTokenHash(tokenHash)).not.toBeNull()
+  })
+
+  it('rejects device registration when the device name is already used', async () => {
+    const { user } = await createTestUser()
+    await insertPasskeyFixture(user.id, { deviceName: 'Laptop' })
+    const token = generateToken()
+    const tokenHash = hashToken(token)
+    await InviteDB.create(user.id, tokenHash, new Date(Date.now() + DEVICE_INVITE_TTL_MS))
+    const spy = vi.spyOn(webauthn, 'verifyRegistration')
+
+    const res = await app.request('/devices/register/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        response: {
+          id: 'fake',
+          rawId: 'fake',
+          response: {},
+          type: 'public-key',
+          clientExtensionResults: {}
+        },
+        deviceName: '  Laptop  '
+      })
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({ error: '同じデバイス名は既に登録されています' })
+    expect(spy).not.toHaveBeenCalled()
+    expect(await InviteDB.findValidByTokenHash(tokenHash)).not.toBeNull()
+  })
+
   it('rejects invalid or expired invite tokens', async () => {
     const res = await app.request('/devices/register/options', {
       method: 'POST',

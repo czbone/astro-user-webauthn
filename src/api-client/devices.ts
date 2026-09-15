@@ -47,7 +47,7 @@ class DeviceFetch {
     }
   }
 
-  async registerVerify(token: string, response: unknown, deviceName?: string) {
+  async registerVerify(token: string, response: unknown, deviceName: string) {
     const res = await apiFetch('/devices/register/verify', {
       method: 'POST',
       body: JSON.stringify({ token, response, deviceName })

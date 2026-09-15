@@ -39,6 +39,19 @@ describe('CredentialDB', () => {
     expect(await CredentialDB.countForUser(user.id)).toBe(1)
   })
 
+  it('detects duplicate device names for the same user only', async () => {
+    const owner = await createTestUser({ email: 'owner@example.com' })
+    const other = await createTestUser({ email: 'other@example.com' })
+    await insertPasskeyFixture(owner.user.id, { deviceName: 'Phone' })
+    await insertPasskeyFixture(other.user.id, { deviceName: 'Phone' })
+
+    expect(CredentialDB.normalizeDeviceName('  Phone  ')).toBe('Phone')
+    expect(CredentialDB.normalizeDeviceName('   ')).toBeNull()
+    expect(await CredentialDB.existsByUserIdAndDeviceName(owner.user.id, 'Phone')).toBe(true)
+    expect(await CredentialDB.existsByUserIdAndDeviceName(owner.user.id, 'Tablet')).toBe(false)
+    expect(await CredentialDB.existsByUserIdAndDeviceName(other.user.id, 'Phone')).toBe(true)
+  })
+
   it('updates counter and lastUsedAt', async () => {
     const { user } = await createTestUser()
     const cred = await insertPasskeyFixture(user.id)

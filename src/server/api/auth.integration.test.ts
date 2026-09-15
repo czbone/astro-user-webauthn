@@ -311,6 +311,61 @@ describe('auth integration', () => {
     await expect(verifyRes.json()).resolves.toEqual({ ok: true })
   })
 
+  it('rejects passkey registration without a device name', async () => {
+    const { user } = await createTestUser()
+    const { token } = await createSession(user.id)
+    const spy = vi.spyOn(webauthn, 'verifyRegistration')
+
+    const verifyRes = await app.request('/auth/passkey/register/verify', {
+      method: 'POST',
+      headers: {
+        Cookie: sessionCookieHeader(token),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        response: {
+          id: 'fake',
+          rawId: 'fake',
+          response: {},
+          type: 'public-key',
+          clientExtensionResults: {}
+        }
+      })
+    })
+
+    expect(verifyRes.status).toBe(400)
+    await expect(verifyRes.json()).resolves.toEqual({ error: 'デバイス名は必須です' })
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('rejects passkey registration with a blank device name', async () => {
+    const { user } = await createTestUser()
+    const { token } = await createSession(user.id)
+    const spy = vi.spyOn(webauthn, 'verifyRegistration')
+
+    const verifyRes = await app.request('/auth/passkey/register/verify', {
+      method: 'POST',
+      headers: {
+        Cookie: sessionCookieHeader(token),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        response: {
+          id: 'fake',
+          rawId: 'fake',
+          response: {},
+          type: 'public-key',
+          clientExtensionResults: {}
+        },
+        deviceName: '   '
+      })
+    })
+
+    expect(verifyRes.status).toBe(400)
+    await expect(verifyRes.json()).resolves.toEqual({ error: 'デバイス名は必須です' })
+    expect(spy).not.toHaveBeenCalled()
+  })
+
   it('rejects second passkey registration from /auth (requires /devices)', async () => {
     const { user } = await createTestUser()
     await insertPasskeyFixture(user.id)

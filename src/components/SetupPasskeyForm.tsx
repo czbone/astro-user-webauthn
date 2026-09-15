@@ -2,11 +2,19 @@ import { useState } from 'react'
 import { startRegistration } from '@simplewebauthn/browser'
 import AuthFetch from '@/api-client/auth'
 
+const DEFAULT_DEVICE_NAME = '自分のノートPC'
+
 export default function SetupPasskeyForm() {
-  const [deviceName, setDeviceName] = useState('')
+  const [deviceName, setDeviceName] = useState(DEFAULT_DEVICE_NAME)
   const [loading, setLoading] = useState(false)
 
   async function handleRegister() {
+    const name = deviceName.trim()
+    if (!name) {
+      alert('デバイス名は必須です')
+      return
+    }
+
     setLoading(true)
     try {
       const optionsResult = await AuthFetch.passkeyRegisterOptions()
@@ -21,10 +29,7 @@ export default function SetupPasskeyForm() {
         >[0]['optionsJSON']
       })
 
-      const verifyResult = await AuthFetch.passkeyRegisterVerify(
-        attestation,
-        deviceName || undefined
-      )
+      const verifyResult = await AuthFetch.passkeyRegisterVerify(attestation, name)
       if (!verifyResult || !verifyResult.response.ok) {
         alert(verifyResult?.data?.error || 'パスキー登録に失敗しました')
         return
@@ -47,12 +52,15 @@ export default function SetupPasskeyForm() {
         続行するには、この端末にパスキーを登録してください。登録後はパスキーでログインします。
       </p>
       <div className="mb-4">
-        <label className="mb-1 block text-sm text-gray-700">デバイス名（任意）</label>
+        <label htmlFor="device-name" className="mb-1 block text-sm text-gray-700">
+          デバイス名
+        </label>
         <input
+          id="device-name"
           type="text"
+          required
           value={deviceName}
           onChange={(e) => setDeviceName(e.target.value)}
-          placeholder="例: 自分のノートPC"
           className="w-full rounded border border-gray-300 px-3 py-2"
         />
       </div>

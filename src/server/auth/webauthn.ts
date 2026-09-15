@@ -75,7 +75,7 @@ export async function createRegistrationOptions(userId: string, email: string, n
 export async function verifyRegistration(
   userId: string,
   response: RegistrationResponseJSON,
-  deviceName?: string
+  deviceName: string
 ) {
   const expected = await takeChallenge('reg', userId)
   if (!expected) {
@@ -101,7 +101,7 @@ export async function verifyRegistration(
     publicKey: Uint8Array.from(credential.publicKey),
     counter: BigInt(credential.counter),
     transports: credential.transports ? JSON.stringify(credential.transports) : null,
-    deviceName: deviceName || null
+    deviceName
   })
 
   return verification

@@ -41,7 +41,7 @@ class AuthFetch {
     return { response: res, data: await readJson<{ options?: unknown; error?: string }>(res) }
   }
 
-  async passkeyRegisterVerify(response: unknown, deviceName?: string) {
+  async passkeyRegisterVerify(response: unknown, deviceName: string) {
     const res = await apiFetch('/auth/passkey/register/verify', {
       method: 'POST',
       body: JSON.stringify({ response, deviceName })

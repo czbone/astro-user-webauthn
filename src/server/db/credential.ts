@@ -14,6 +14,20 @@ class CredentialDB {
     })
   }
 
+  normalizeDeviceName(raw: unknown): string | null {
+    if (raw == null) return null
+    const name = String(raw).trim()
+    return name.length > 0 ? name : null
+  }
+
+  async existsByUserIdAndDeviceName(userId: string, deviceName: string) {
+    const found = await prisma.webAuthnCredential.findFirst({
+      where: { userId, deviceName },
+      select: { id: true }
+    })
+    return Boolean(found)
+  }
+
   async create(data: {
     userId: string
     credentialId: string

@@ -52,7 +52,7 @@ Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + Redis + React Islands による
 ### PostgreSQL（永続）
 
 - `User`: id(UUID), email, password(scrypt ハッシュ), name, role
-- `WebAuthnCredential`: credentialId, publicKey, counter, transports, deviceName
+- `WebAuthnCredential`: credentialId, publicKey, counter, transports, deviceName（登録時は必須。同一ユーザー内で重複不可。既存の未設定レコードは null 可）
 - `Post`: title, content, published, authorId
 
 ### Redis（短命・セッション）
@@ -91,7 +91,7 @@ Session / Invite / Reset / Magic のトークンは生値を Cookie・URL・メ�
 
 - `POST /login/password` — Credential 0 件のみ（seed 管理者用）
 - `POST /login/passkey/options|verify`
-- `POST /passkey/register/options|verify` — 初回のみセッションから直接登録可
+- `POST /passkey/register/options|verify` — 初回のみセッションから直接登録可。verify はデバイス名必須・同一ユーザーで重複不可
 - `POST /magic/consume` — 招待トークン消費（確認ボタン）。パスキー済みは拒否
 - `POST /magic/resend` — パスキー 0 件のときだけ再発行。発行時は既存 Session を全削除
 - `POST /password-reset/request|confirm`
@@ -107,7 +107,7 @@ Session / Invite / Reset / Magic のトークンは生値を Cookie・URL・メ�
 - `GET /` / `DELETE /:id`（最後の1件は削除不可）
 - `POST /reauth/options|verify`
 - `POST /invite`（再認証必須＋メール）
-- `POST /register/options|verify`（招待トークン、ログイン不要）
+- `POST /register/options|verify`（招待トークン、ログイン不要）。verify はデバイス名必須・同一ユーザーで重複不可
 
 ### 投稿 `/api/posts`
 
@@ -133,6 +133,7 @@ Session / Invite / Reset / Magic のトークンは生値を Cookie・URL・メ�
 - DeviceInvite / PasswordReset / MagicLink は短命・単回使用（目安: 1h）
 - ログイン・再設定・マジックリンク発行に簡易レート制限（Redis 固定ウィンドウ）
 - パスキー未設定セッションは setup / logout / me 以外を拒否
+- パスキー登録時のデバイス名は必須。同一ユーザー内で重複不可
 - 2台目以降のパスキーは再認証＋メール招待のみ（クリックではログインしない）
 - パスワード再設定 UI で「全パスキー無効化」を警告表示
 - 再設定完了時は全 Credential 削除・全 Session 失効・未使用 DeviceInvite / MagicLink 無効化
