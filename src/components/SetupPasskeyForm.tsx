@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { startRegistration } from '@simplewebauthn/browser'
 import AuthFetch from '@/api-client/auth'
+import { startRegistration } from '@simplewebauthn/browser'
+import { useState } from 'react'
 
 const DEFAULT_DEVICE_NAME = '自分のノートPC'
 
@@ -49,7 +49,7 @@ export default function SetupPasskeyForm() {
     <div className="mx-auto max-w-md rounded-lg bg-white p-6 shadow">
       <h2 className="mb-2 text-xl font-semibold text-gray-900">パスキーを登録</h2>
       <p className="mb-4 text-sm text-gray-600">
-        続行するには、この端末にパスキーを登録してください。登録後はパスキーでログインします。
+        続行するには、この端末にデバイス名をつけてパスキーを登録してください。登録後はパスキーでログインします。
       </p>
       <div className="mb-4">
         <label htmlFor="device-name" className="mb-1 block text-sm text-gray-700">
