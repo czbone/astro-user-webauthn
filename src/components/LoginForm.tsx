@@ -113,7 +113,7 @@ export default function LoginForm() {
         <div className="space-y-4">
           <p className="text-sm text-gray-600">{email}</p>
           <p className="text-sm text-gray-700">
-            招待メールのリンクを開いてログインしてください。届いていない場合は再送できます。
+            招待メールのリンクを開いてログインしてください。届いていない、または期限切れの場合は再送できます。復旧でパスワードを設定済みの場合は、下のパスワードでもログインできます。
           </p>
           {resendMessage ? (
             <p className="text-sm text-gray-800">{resendMessage}</p>
@@ -128,7 +128,7 @@ export default function LoginForm() {
             </button>
           )}
           <form onSubmit={handlePasswordLogin} className="space-y-4 border-t border-gray-200 pt-4">
-            <p className="text-sm text-gray-600">初期管理者など、パスワードをお持ちの場合</p>
+            <p className="text-sm text-gray-600">初期管理者、または復旧で設定したパスワード</p>
             <div>
               <label className="mb-1 block text-sm text-gray-700">パスワード</label>
               <input
