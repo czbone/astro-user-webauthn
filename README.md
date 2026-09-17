@@ -4,6 +4,8 @@ Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + Redis による、管理者招�
 
 詳細仕様は [`docs/specification.md`](docs/specification.md)、[`docs/session-management.md`](docs/session-management.md)、[`docs/redis.md`](docs/redis.md) を参照してください。テスト方法は [`docs/testing.md`](docs/testing.md) を参照してください。
 
+![ログイン画面](docs/screenshots/login.png)
+
 ## 主な機能
 
 - 管理者招待（マジックリンク＋メール通知）
@@ -24,8 +26,6 @@ Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + Redis による、管理者招�
 - Tailwind CSS 4
 - `@simplewebauthn/server` / `@simplewebauthn/browser`
 - nodemailer（`MAIL_MODE=console|smtp`）
-
-![ログイン画面](docs/screenshots/login.png)
 
 ## セットアップ
 
