@@ -25,6 +25,8 @@ Astro 7（SSR）+ Hono + Prisma 7 + PostgreSQL + Redis による、管理者招�
 - `@simplewebauthn/server` / `@simplewebauthn/browser`
 - nodemailer（`MAIL_MODE=console|smtp`）
 
+![ログイン画面](docs/screenshots/login.png)
+
 ## セットアップ
 
 ### 1. 依存関係
