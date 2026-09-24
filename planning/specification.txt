@@ -1,10 +1,12 @@
-今回の要件であれば、以下の仕様にするとシンプルかつ安全です。
+セッションは次の仕様で管理します。
 
 ## セッション管理仕様
 
 ### 1. 認証方式
 
-認証には **WebAuthn** を使用します。
+パスキー登録後のログインには **WebAuthn** を使用します。
+
+招待ユーザーの初回はマジックリンク、seed 管理者の初回はパスワードログインです。いずれもパスキー登録後は WebAuthn のみでログインします。パスキーでログインできないときの復旧はパスワード再設定です。
 
 ```text
 WebAuthn Credential
@@ -22,51 +24,46 @@ WebAuthnのCredentialとSessionは別物として管理します。
 
 ### 2. ログイン時
 
-WebAuthnによる認証に成功したら、新しいSessionを発行します。
+認証に成功したら、新しいSessionを発行します。
 
 ```text
-WebAuthn認証
-    ↓
-Credential検証
+認証成功
     ↓
 User特定
     ↓
 ランダムなSession Token生成
     ↓
-DBにTokenのハッシュを保存
+SHA-256ハッシュをキーにRedisへ保存
     ↓
 Cookie発行
 ```
 
 Session Tokenは暗号学的に安全な乱数から生成します。
 
-DBには生のTokenではなく、ハッシュを保存します。
+Redisには生のTokenを保存しません。キーは Token の SHA-256 ハッシュです。
 
 ```text
-Session
+sess:{tokenHash}
 ├─ id
 ├─ userId
-├─ tokenHash
-├─ createdAt
-├─ lastUsedAt
-└─ revokedAt
+└─ createdAt
 ```
 
 ---
 
 ### 3. セッションCookie
 
-Cookieは永続Cookieにします。
+Cookieは永続Cookieにします。名前は `session` です。
 
 ```http
 HttpOnly
-Secure
+Secure（本番のみ）
 SameSite=Lax
 Path=/
 Max-Age=2592000
 ```
 
-`Max-Age=2592000` は30日です。
+`Max-Age=2592000` は30日です。`Secure` は `NODE_ENV=production` のときだけ付けます。
 
 これにより、**ブラウザを閉じてもCookieは残ります**。
 
@@ -100,18 +97,18 @@ Max-Age=2592000
       Cookie有効期限：9/29
 ```
 
-というように、アクセスするたびに有効期限を30日延長します。
+というように、アクセスするたびに有効期限を30日延長します。Cookie の Max-Age と Redis キーの TTL は同じ秒数です。
 
 ---
 
-### 5. Session ID自体は毎回変更しない
+### 5. Session Token自体は毎回変更しない
 
 ここは重要です。
 
-通常のアクセスでは、
+通常のアクセスでは、Cookie に載っている
 
 ```text
-Session ID = ABCDEF...
+Session Token = ABCDEF...
 ```
 
 を維持します。
@@ -120,14 +117,14 @@ Session ID = ABCDEF...
 
 ```text
 Cookieの有効期限
-lastUsedAt
+RedisキーのTTL（EXPIRE）
 ```
 
 だけを更新します。
 
-**Session IDを毎回再生成する必要はありません。**
+**Session Tokenを毎回再生成する必要はありません。**
 
-ただし、WebAuthnログインに成功して新しいログインセッションを作るときは、新しいSession IDを発行します。
+ただし、新しいログインに成功したときは、新しい Session Token を発行します。
 
 ---
 
@@ -140,22 +137,20 @@ Cookieだけを信頼しません。
 ```text
 Cookie
   ↓
-Session検索
+TokenをSHA-256
   ↓
-revokedAtを確認
+Redisの sess:{hash} を検索
   ↓
-lastUsedAtを確認
-  ↓
-30日以上経過？
+キーなし / TTL切れ？
   ├─ YES → Session無効 → ログイン要求
-  └─ NO  → 認証済み
+  └─ NO  → 認証済み（TTLとCookie期限を30日延長）
 ```
 
 とします。
 
-つまり、**CookieとDBの両方でセッションの有効性を管理**します。
+つまり、**CookieとRedisの両方でセッションの有効性を管理**します。
 
-Cookieが何らかの理由で残っていても、DB側で失効していればログインできません。
+Cookieが何らかの理由で残っていても、Redis側でキーが無ければログインできません。
 
 ---
 
@@ -164,22 +159,14 @@ Cookieが何らかの理由で残っていても、DB側で失効していれば
 ユーザーがログアウトした場合は、
 
 ```text
-Cookie削除
+当該SessionのRedisキーを削除
      ↓
-SessionをDB上で失効
+Cookie削除
 ```
 
 とします。
 
-単純にCookieだけ削除するのではなく、DB側のSessionも失効させます。
-
-例えば、
-
-```text
-revokedAt = 現在時刻
-```
-
-とします。
+Cookieを削除し、Redis上のそのSessionも削除します。他デバイスのSessionには影響しません。
 
 ---
 
@@ -227,7 +214,7 @@ WebAuthn Credential登録
 
 招待TokenとSession Tokenは**完全に別物**として扱います。
 
-また、既にログインしているユーザーがデバイスを追加する場合は、重要操作なので**既存のWebAuthnによる再認証**を要求するのが安全です。
+また、既にログインしているユーザーがデバイスを追加する場合は、重要操作なので**既存のWebAuthnによる再認証**を要求します。
 
 ---
 
@@ -240,7 +227,7 @@ WebAuthn Credential登録
     ↓
 Session Cookieなし
     ↓
-WebAuthnログイン
+ログイン（パスキー登録後はWebAuthn）
     ↓
 Session発行
     ↓
@@ -251,14 +238,14 @@ Cookie（30日）発行
     ↓
 Cookie送信
     ↓
-Session DB確認
+RedisでSession確認
     ↓
-lastUsedAtから30日以内
+キーが存在しTTL内
     ↓
 ログイン済み
     ↓
 Cookie期限を30日延長
-lastUsedAt更新
+Redis TTLを30日延長
 ──────────────────
 ```
 
@@ -269,7 +256,7 @@ lastUsedAt更新
   ↓
 Cookieなし/期限切れ
 または
-SessionのlastUsedAtから30日超過
+RedisのTTL切れ（キー不存在）
   ↓
 Session無効
   ↓
@@ -283,32 +270,31 @@ WebAuthnログイン
 ```text
 ユーザーがログアウト
         ↓
-Session失効
+当該SessionのRedisキーを削除
         ↓
 Cookie削除
 ```
 
 となります。
 
-### 推奨する最終仕様
+### 最終仕様
 
-| 項目              | 仕様                               |
-| --------------- | -------------------------------- |
-| 認証              | WebAuthn                         |
-| Session         | DB管理                             |
-| Session ID      | 暗号学的乱数                           |
-| DB              | Session IDのハッシュを保存               |
-| Cookie          | HttpOnly / Secure / SameSite=Lax |
-| Cookie寿命        | 30日                              |
-| Cookie方式        | 永続Cookie                         |
-| 有効期限            | 最終アクセスから30日                      |
-| アクセス時           | Cookie期限を30日延長                   |
-| Session ID      | 通常アクセスでは変更しない                    |
-| DB `lastUsedAt` | アクセスに応じて更新                       |
-| 30日アクセスなし       | Session失効・WebAuthn再認証            |
-| ログアウト           | Cookie削除＋Session失効               |
-| 複数デバイス          | Credential / Sessionともに複数管理      |
-| デバイス追加          | メール招待＋WebAuthn登録                 |
-| 重要操作            | WebAuthnによる再認証                   |
+| 項目 | 仕様 |
+| --- | --- |
+| 認証 | パスキー登録後は WebAuthn。初回はマジックリンクまたはパスワード。復旧はパスワード再設定 |
+| Session | Redis管理（`sess:{tokenHash}`） |
+| Session Token | 暗号学的乱数。Cookieに生値、Redisキーは SHA-256 |
+| Redisの値 | `id` / `userId` / `createdAt` |
+| Cookie | 名前 `session`。HttpOnly / SameSite=Lax / Path=/（Secure は本番のみ） |
+| Cookie寿命 | 30日 |
+| Cookie方式 | 永続Cookie |
+| 有効期限 | 最終アクセスから30日（Redis TTL） |
+| アクセス時 | Cookie期限と Redis TTL を30日延長 |
+| Session Token | 通常アクセスでは変更しない |
+| 30日アクセスなし | Session無効・WebAuthn再認証 |
+| ログアウト | Cookie削除＋当該Redisキー削除 |
+| 複数デバイス | Credential / Sessionともに複数管理 |
+| デバイス追加 | メール招待＋WebAuthn登録 |
+| 重要操作 | WebAuthnによる再認証 |
 
 この仕様なら、**「普段はログインを意識せず使えるが、1か月使わなければWebAuthnで再認証する」**という挙動になります。
