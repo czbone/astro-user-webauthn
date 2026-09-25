@@ -19,6 +19,8 @@ pnpm test:watch
 
 - `src/server/auth/*.test.ts` — パスワード・トークン・レート制限・チャレンジなどの純関数
 - `src/server/api/app.test.ts` — `app.request()` による API スモーク（未認証応答など）
+- `src/server/env-check.test.ts` — 本番の環境変数チェック
+- `src/server/db-log.test.ts` — Prisma のログレベル
 
 実 PostgreSQL / Playwright / パスキー UI は使いません。
 
@@ -55,8 +57,11 @@ pnpm test:all
 
 対象:
 
-- `src/server/api/auth.integration.test.ts` — パスワード／マジックリンク、セッション、ログアウト、再設定リクエスト
-- `src/server/api/posts.integration.test.ts` — パスキー未登録 403 / フィクスチャありで一覧 200
+- `src/server/api/auth.integration.test.ts` — パスワード／マジックリンク、セッション、ログアウト、再設定、パスキー登録
+- `src/server/api/admin.integration.test.ts` — ユーザー招待・一覧・統計
+- `src/server/api/devices.integration.test.ts` — 一覧、削除、再認証、招待、登録
+- `src/server/api/posts.integration.test.ts` — パスキー未登録 403、一覧、作成・更新・削除、下書き権限
+- `src/server/db/*.integration.test.ts` — User / Credential / Post / Session / DeviceInvite / PasswordReset / MagicLink
 
 ## 静的チェック
 

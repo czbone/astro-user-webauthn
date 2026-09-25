@@ -110,6 +110,7 @@ Session / Invite / Reset / Magic のトークンは生値を Cookie・URL・メ�
 ### 認証 `/api/auth`
 
 - `POST /login/password` — Credential 0 件のみ（seed 管理者の初回、および復旧直後のパスキー再登録前）
+- `POST /login/method` — メールアドレスからログイン方式を判定。Credential ありはパスキー（options 付き）、0 件はマジックリンク。存在しないメールは 401
 - `POST /login/passkey/options|verify`
 - `POST /passkey/register/options|verify` — 初回のみセッションから直接登録可。verify はデバイス名必須・同一ユーザーで重複不可
 - `POST /magic/consume` — 招待トークン消費（確認ボタン）。パスキー済みは拒否
@@ -145,6 +146,8 @@ Session / Invite / Reset / Magic のトークンは生値を Cookie・URL・メ�
 - `APP_URL`
 - `MAIL_MODE` / `SMTP_*`
 - `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`
+- `DB_LOG_LEVEL`（任意。`silent` / `error` / `warn` / `info` / `query`。未設定は本番 `warn`、開発 `query`）
+- `RUN_SEED`（任意。`true` のとき起動時にシード。User が空のときだけ管理者を作成。本番では `SEED_ADMIN_PASSWORD` に既定値以外が必要）
 
 詳細は [redis.md](./redis.md)。
 

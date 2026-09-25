@@ -140,6 +140,7 @@ sess:user:{userId} を DEL
 | データ | TTL | 備考 |
 |--------|-----|------|
 | WebAuthn challenge / reauth-ok | 300 秒 | 消費型（GET + DEL） |
-| Rate limit | ウィンドウごと（例: 15 分） | 固定ウィンドウ、`INCR` + `EXPIRE` |
+| Rate limit | ウィンドウごと（例: 15 分） | 固定ウィンドウ、`INCR` + `PEXPIRE` |
 | DeviceInvite | 3600 秒 | 単回使用、ユーザー索引 SET あり |
 | PasswordReset | 3600 秒 | 単回使用、ユーザー索引 SET あり |
+| MagicLink | 3600 秒 | 単回使用、ユーザー索引 SET あり、招待専用 |

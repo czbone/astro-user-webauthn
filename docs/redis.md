@@ -81,7 +81,7 @@
 
 - `kind` 例: `reg`, `auth`, `reauth`, `reauth-ok`
 - `save` は `SET` + `EX 300`
-- `auth` は userId キーと `chal:auth-challenge:{challenge}` の二重登録（現行 in-memory 実装と同じセマンティクス）
+- `auth` は userId キー（`chal:auth:{userId}`）と `chal:auth-challenge:{challenge}` の二重登録
 - `take*` は GET のあと DEL（消費型）。auth は関連キーを両方削除
 - `reauth-ok` も同じストア（`kind=reauth-ok`）
 
@@ -90,7 +90,7 @@
 固定ウィンドウ方式。
 
 - キー例: `rl:pwd:{ip}:{email}`, `rl:method:{ip}:{email}`, `rl:reset:{ip}:{email}`, `rl:magic:{ip}`, `rl:magic-resend:{ip}:{email}`
-- `INCR`。カウンタが 1 のときだけ `EXPIRE` でウィンドウ秒数を設定
+- `INCR`。カウンタが 1 のときだけ `PEXPIRE` でウィンドウのミリ秒を設定
 - 制限値（現行どおり）:
   - password: 10 / 15 分
   - method: 30 / 15 分
