@@ -1,6 +1,38 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { startAuthentication } from '@simplewebauthn/browser'
 import AuthFetch from '@/api-client/auth'
+
+const PASSKEY_RETRY_ALERT =
+  'パスキーを表示できませんでした。もう一度「パスキーでログイン」を押してください'
+const PASSKEY_CEREMONY_ALERT = 'パスキー認証がキャンセルされたか失敗しました'
+
+function summarizePasskeyOptions(options: unknown) {
+  if (!options || typeof options !== 'object') {
+    return { allowCredentialCount: 0, allowCredentialHasTransports: [] as boolean[] }
+  }
+  const record = options as { rpId?: unknown; allowCredentials?: unknown }
+  const allowCredentials = Array.isArray(record.allowCredentials) ? record.allowCredentials : []
+  return {
+    ...(typeof record.rpId === 'string' ? { rpId: record.rpId } : {}),
+    allowCredentialCount: allowCredentials.length,
+    allowCredentialHasTransports: allowCredentials.map((cred) => {
+      if (!cred || typeof cred !== 'object' || !('transports' in cred)) return false
+      return cred.transports != null
+    })
+  }
+}
+
+function passkeyErrorDetails(error: unknown) {
+  if (!(error instanceof Error)) {
+    return { name: 'unknown', message: String(error) }
+  }
+  const code = 'code' in error && typeof error.code === 'string' ? error.code : undefined
+  return {
+    name: error.name,
+    message: error.message,
+    ...(code ? { code } : {})
+  }
+}
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -9,6 +41,7 @@ export default function LoginForm() {
   const [passkeyOptions, setPasskeyOptions] = useState<unknown>(null)
   const [loading, setLoading] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
+  const passkeyAttemptRef = useRef(0)
 
   async function handleContinue(e: React.FormEvent) {
     e.preventDefault()
@@ -63,10 +96,21 @@ export default function LoginForm() {
 
   async function handlePasskeyLogin() {
     if (!passkeyOptions) return
+    const attempt = ++passkeyAttemptRef.current
+    const optionsSummary = summarizePasskeyOptions(passkeyOptions)
     setLoading(true)
+    const started = performance.now()
+    let ceremonySettled = false
     try {
       const assertion = await startAuthentication({
         optionsJSON: passkeyOptions as Parameters<typeof startAuthentication>[0]['optionsJSON']
+      })
+      ceremonySettled = true
+      console.info('[passkey-login]', {
+        attempt,
+        phase: 'assertion-ok',
+        elapsedMs: Math.round(performance.now() - started),
+        ...optionsSummary
       })
       const result = await AuthFetch.loginPasskeyVerify(assertion)
       if (!result || !result.response.ok) {
@@ -76,8 +120,24 @@ export default function LoginForm() {
       const role = result.data?.user?.role
       window.location.href = role === 'admin' ? '/dashboard' : '/posts'
     } catch (error) {
+      if (!ceremonySettled) {
+        const details = passkeyErrorDetails(error)
+        console.error(
+          '[passkey-login]',
+          {
+            attempt,
+            phase: 'ceremony-error',
+            elapsedMs: Math.round(performance.now() - started),
+            ...details,
+            ...optionsSummary
+          },
+          error
+        )
+        alert(details.name === 'NotAllowedError' ? PASSKEY_RETRY_ALERT : PASSKEY_CEREMONY_ALERT)
+        return
+      }
       console.error(error)
-      alert('パスキー認証がキャンセルされたか失敗しました')
+      alert(PASSKEY_CEREMONY_ALERT)
     } finally {
       setLoading(false)
     }
