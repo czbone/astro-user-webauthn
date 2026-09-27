@@ -34,11 +34,7 @@ function parseTransports(value: string | null | undefined): AuthenticatorTranspo
   }
 }
 
-function toCredentialDescriptor(cred: { credentialId: string; transports: string | null }) {
-  const transports = parseTransports(cred.transports)
-  if (transports) {
-    return { id: cred.credentialId, transports }
-  }
+function toCredentialDescriptor(cred: { credentialId: string }) {
   return { id: cred.credentialId }
 }
 

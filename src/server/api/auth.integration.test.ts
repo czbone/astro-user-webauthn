@@ -152,7 +152,9 @@ describe('auth integration', () => {
 
   it('returns passkey method and options for users with passkeys', async () => {
     const { email, user } = await createTestUser()
-    await insertPasskeyFixture(user.id)
+    const credential = await insertPasskeyFixture(user.id, {
+      transports: JSON.stringify(['internal'])
+    })
 
     const res = await app.request('/auth/login/method', {
       method: 'POST',
@@ -163,10 +165,11 @@ describe('auth integration', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.method).toBe('passkey')
-    expect(body.options).toMatchObject({
-      challenge: expect.any(String),
-      allowCredentials: expect.any(Array)
-    })
+    expect(body.options.allowCredentials).toEqual([
+      { id: credential.credentialId, type: 'public-key' }
+    ])
+    expect(body.options.allowCredentials[0]).not.toHaveProperty('transports')
+    expect(body.options.challenge).toEqual(expect.any(String))
   })
 
   it('returns 401 for non-existent email', async () => {
