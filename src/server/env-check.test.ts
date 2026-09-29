@@ -88,9 +88,9 @@ describe('collectEnvIssues', () => {
     const issues = collectEnvIssues(
       {
         ...productionBase,
-        APP_URL: 'https://sample1.keyaki.cc',
-        WEBAUTHN_ORIGIN: 'https://sample.keyaki.cc',
-        WEBAUTHN_RP_ID: 'sample.keyaki.cc'
+        APP_URL: 'https://sample1.example.test',
+        WEBAUTHN_ORIGIN: 'https://sample.example.test',
+        WEBAUTHN_RP_ID: 'sample.example.test'
       },
       true
     )
@@ -108,7 +108,7 @@ describe('collectEnvIssues', () => {
     const issues = collectEnvIssues(
       {
         ...productionBase,
-        WEBAUTHN_RP_ID: 'sample.keyaki.cc'
+        WEBAUTHN_RP_ID: 'sample.example.test'
       },
       true
     )
@@ -139,9 +139,9 @@ describe('collectEnvIssues', () => {
   it('does not check origin consistency outside production', () => {
     const issues = collectEnvIssues(
       {
-        APP_URL: 'https://sample1.keyaki.cc',
-        WEBAUTHN_ORIGIN: 'https://sample.keyaki.cc',
-        WEBAUTHN_RP_ID: 'sample.keyaki.cc'
+        APP_URL: 'https://sample1.example.test',
+        WEBAUTHN_ORIGIN: 'https://sample.example.test',
+        WEBAUTHN_RP_ID: 'sample.example.test'
       },
       false
     )
