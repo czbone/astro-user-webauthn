@@ -75,6 +75,10 @@ seed 管理者: 初期パスワードログイン → パスキー必須登録 �
 - `WebAuthnCredential`: credentialId, publicKey, counter, transports, deviceName（登録時は必須。同一ユーザー内で重複不可。既存の未設定レコードは null 可）
 - `Post`: title, content, published, authorId
 
+ブラウザへ渡す資格情報一覧は ID のみとする。対象はログインと再認証の `allowCredentials`、登録時の `excludeCredentials`。`transports` は付けない。Chrome は `transports` を絞り込みに使い、候補が 0 件だと「利用可能なパスキーがありません」を出す。
+
+`transports` は登録応答から PostgreSQL に保存し、パスキー検証と再認証検証で署名を確かめるときだけ使う。`allowCredentials` は外さない。入力したメールアドレスの資格情報に儀式を縛る。
+
 ### Redis（短命・セッション）
 
 - Session: `sess:{tokenHash}`（値: id, userId, createdAt）+ `sess:user:{userId}` 索引
@@ -110,8 +114,8 @@ Session / Invite / Reset / Magic のトークンは生値を Cookie・URL・メ�
 ### 認証 `/api/auth`
 
 - `POST /login/password` — Credential 0 件のみ（seed 管理者の初回、および復旧直後のパスキー再登録前）
-- `POST /login/method` — メールアドレスからログイン方式を判定。Credential ありはパスキー（options 付き）、0 件はマジックリンク。存在しないメールは 401
-- `POST /login/passkey/options|verify`
+- `POST /login/method` — メールアドレスからログイン方式を判定。Credential ありはパスキー（options 付き。資格情報一覧は ID のみ）、0 件はマジックリンク。存在しないメールは 401
+- `POST /login/passkey/options|verify` — options の資格情報一覧は ID のみ（上記）
 - `POST /passkey/register/options|verify` — 初回のみセッションから直接登録可。verify はデバイス名必須・同一ユーザーで重複不可
 - `POST /magic/consume` — 招待トークン消費（確認ボタン）。パスキー済みは拒否
 - `POST /magic/resend` — パスキー 0 件のときだけ再発行。発行時は既存 Session を全削除
