@@ -30,12 +30,12 @@
     "@simplewebauthn/browser": "^14.0.0",
     "@simplewebauthn/server": "^14.0.3",
     "astro": "^7.3.5",
-    "dotenv": "^18.0.4",
+    "dotenv": "^18.0.5",
     "flowbite": "^4.0.2",
-    "hono": "^4.13.10",
+    "hono": "^4.13.12",
     "ioredis": "^6.0.0",
-    "nodemailer": "^10.0.12",
-    "pg": "^8.23.0",
+    "nodemailer": "^10.0.14",
+    "pg": "^8.23.1",
     "prisma": "^7.10.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
@@ -43,16 +43,16 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.6.3",
+    "@types/node": "^26.6.4",
     "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@typescript-eslint/parser": "^8.71.0",
     "astro-eslint-parser": "^3.2.0",
     "esbuild": "^0.28.2",
-    "eslint": "^10.11.0",
+    "eslint": "^10.12.0",
     "eslint-plugin-astro": "^3.2.1",
-    "globals": "^17.12.0",
+    "globals": "^17.13.0",
     "prettier": "^3.9.9",
     "prettier-plugin-astro": "^1.1.0",
     "prettier-plugin-tailwindcss": "^0.8.1",
@@ -60,6 +60,6 @@
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.0",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.3"
   }
 }
